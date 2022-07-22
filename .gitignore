@@ -1,0 +1,8 @@
+.cache/
+.parcel-cache/
+.psci_modules/
+.spago/
+dist/
+distassets/
+node_modules/
+output/
