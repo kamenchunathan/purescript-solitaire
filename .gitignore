@@ -6,3 +6,4 @@ dist/
 distassets/
 node_modules/
 output/
+generated-docs

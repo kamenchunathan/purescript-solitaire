@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-
+
 import App.Game as Game
 import Effect (Effect)
 import Halogen.Aff as HA

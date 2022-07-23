@@ -1,12 +1,16 @@
 module App.Game where
 
 import Prelude
-import Data.Array (reverse)
+import Data.Array (reverse, range, splitAt, (:))
+import Data.Int (toStringAs, decimal)
+import Data.Foldable (foldr)
 
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 
+
+------------------------------------------------ MODEL -------------------------------------------------
 
 data Suit
     = Spades
@@ -14,9 +18,21 @@ data Suit
     | Clubs
     | Diamonds
 
-data Colour
+instance showSuit :: Show Suit where
+    show Spades = "Spades"
+    show Hearts = "Hearts"
+    show Clubs = "Clubs"
+    show Diamonds = "Diamonds"
+
+
+data CardColour
     = Black
     | Red
+
+instance showCardColour :: Show CardColour where
+    show Black = "Black"
+    show Red = "Red"
+
 
 data Value 
     = Ace
@@ -25,16 +41,29 @@ data Value
     | Queen
     | King
 
+instance showCardValue :: Show Value where
+    show Ace        = "Ace"
+    show ( Num i )  = toStringAs decimal i
+    show Jack       = "Jack"
+    show Queen      = "Queen"
+    show King       = "King"
+
+
 
 type NormalCard = 
     { value :: Value
     , suit :: Suit
     }
-
+ 
 
 data Card 
-    = Card NormalCard 
-    | Joker Colour
+    = NormalCard NormalCard 
+    | Joker CardColour
+
+instance showCard :: Show Card where
+    show ( NormalCard c ) = show c
+    show ( Joker Red    ) = "Red joker"
+    show ( Joker Black  ) = "Black joker"
 
 
 type Pile = Array Card
@@ -43,23 +72,26 @@ type Pile = Array Card
 type State = 
     { stock         :: Pile
     -- 7 Piles with only the top card face up
-    , tableau       :: Array Pile        
+    , tableau       :: Array Pile
      -- a pile where cards are dealt from the stock 
-    , waste         :: Pile            
+    , waste         :: Pile
      -- 4 stacks of cards, one for each suit in ascending order
-    , foundations   :: Array Pile       
+    , foundations   :: Array Pile
     } 
 
 
-data Action
-    = NoOp
+initialState :: forall input. input -> State
+initialState _ =
+  { stock         : []
+  , tableau       : []
+  , waste         : []
+  , foundations   : []
+  }
 
 
-orderedDeck :: Pile 
-orderedDeck = 
-    [ Joker Black
-    , Joker Red
-    ] 
+orderedDeck :: Pile
+orderedDeck =
+    [ Joker Black , Joker Red ]
     <> singleSuit Spades
     <> singleSuit Diamonds
     <> ( reverse $ singleSuit Clubs  )
@@ -68,19 +100,57 @@ orderedDeck =
 
 singleSuit :: Suit -> Pile 
 singleSuit suit = 
-    [ Card { value: Ace,    suit : suit }
-    , Card { value: Num 2,  suit : suit }
-    , Card { value: Num 3,  suit : suit }
-    , Card { value: Num 4,  suit : suit }
-    , Card { value: Num 5,  suit : suit }
-    , Card { value: Num 6,  suit : suit }
-    , Card { value: Num 7,  suit : suit }
-    , Card { value: Num 8,  suit : suit }
-    , Card { value: Num 9,  suit : suit }
-    , Card { value: Num 10, suit : suit }
-    , Card { value: Jack,   suit : suit }
-    , Card { value: Queen,  suit : suit }
-    , Card { value: King,   suit : suit }
+    [ NormalCard { value: Ace,    suit : suit }
+    , NormalCard { value: Num 2,  suit : suit }
+    , NormalCard { value: Num 3,  suit : suit }
+    , NormalCard { value: Num 4,  suit : suit }
+    , NormalCard { value: Num 5,  suit : suit }
+    , NormalCard { value: Num 6,  suit : suit }
+    , NormalCard { value: Num 7,  suit : suit }
+    , NormalCard { value: Num 8,  suit : suit }
+    , NormalCard { value: Num 9,  suit : suit }
+    , NormalCard { value: Num 10, suit : suit }
+    , NormalCard { value: Jack,   suit : suit }
+    , NormalCard { value: Queen,  suit : suit }
+    , NormalCard { value: King,   suit : suit }
+    ]
+
+
+splitDecktoTableauAndStock :: Pile -> {tableau :: Array Pile, stock :: Pile }
+splitDecktoTableauAndStock deck =
+    { tableau   : res.before
+    , stock     : res.after
+    }
+    where
+        res = foldr 
+            (\i tab ->  { after:  (splitAt i tab.after).after
+                        , before: (splitAt i tab.after).before : tab.before 
+                        }
+                    )
+            { after: deck, before: [] }
+            ( range 1 7 )
+
+
+------------------------------------------------ UPDATE -------------------------------------------------
+
+
+data Action
+    = NoOp
+
+
+handleAction :: forall cs o m. Action → H.HalogenM State Action cs o m Unit
+handleAction = case _ of
+    _ -> H.modify_ initialState
+
+
+------------------------------------------------ RENDER -------------------------------------------------
+
+render :: forall cs m. State -> H.ComponentHTML Action cs m
+render _ =
+    HH.div
+    []
+    [ HH.img [ HP.src "./assets/joker.png" ]
+    , HH.img [ HP.src "./assets/6_spades.png" ]
     ]
 
 
@@ -93,22 +163,3 @@ component =
         }
 
 
-initialState :: forall input. input -> State
-initialState _ = 
-  { stock         : [] 
-  , tableau       : []   
-  , waste         : []   
-  , foundations   : []
-  }                
-
-
-render :: forall cs m. State -> H.ComponentHTML Action cs m
-render _ =
-    HH.div 
-    [] 
-    [ HH.img [ HP.src "./assets/joker.png" ]
-    ]
-
-handleAction :: forall cs o m. Action → H.HalogenM State Action cs o m Unit
-handleAction = case _ of
-    _ -> H.modify_ initialState
