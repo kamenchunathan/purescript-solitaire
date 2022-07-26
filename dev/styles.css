@@ -48,3 +48,8 @@ body {
   width: 60px;
   height: 84px;
 }
+
+.tableau-pile {
+  display: flex;
+  flex-direction: column;
+}

@@ -189,7 +189,7 @@ waste wastePile =
 foundations :: forall cs m. Array ( Maybe Pile ) -> H.ComponentHTML Action cs m
 foundations fPiles =
     HH.div
-        [ HP.class_ $ HH.ClassName "slot foundations" ]
+        [ HP.class_ $ HH.ClassName "foundations slot" ]
         ( map 
             (\maybePile -> 
                 fromMaybe emptySlot ((\pile -> 
@@ -201,11 +201,20 @@ foundations fPiles =
         ) 
 
 tableau :: forall cs m. Array ( Maybe Pile ) -> H.ComponentHTML Action cs m
-tableau _ =
+tableau tPiles =
     HH.div 
-        [ HP.class_ $ HH.ClassName "slot tableau" ]
-        [ HH.img [ HP.src $ "./assets/" <> ( cardImageUri $ NormalCard { value: Num 3, suit: Spades })]
+        [ HP.class_ $ HH.ClassName "slot tableau"
+        , HP.style "align-items: start;" 
         ]
+        ( map 
+            (\maybePile -> fromMaybe emptySlot ((\pile ->
+                HH.div 
+                    [ HP.class_ $ HH.ClassName "tableau-pile" ]
+                    ( map (\card ->  HH.img [ HP.src $ "./assets/" <> (cardImageUri card)]) pile )
+            ) <$> maybePile))
+            tPiles 
+        )
+        
 
  
 render :: forall cs m. State -> H.ComponentHTML Action cs m
