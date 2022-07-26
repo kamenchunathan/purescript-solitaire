@@ -4,6 +4,7 @@ import Prelude
 import Data.Array (reverse, range, splitAt, (:))
 import Data.Int (toStringAs, decimal)
 import Data.Foldable (foldr)
+import Data.String (toLower, joinWith)
 
 import Halogen as H
 import Halogen.HTML as HH
@@ -19,10 +20,10 @@ data Suit
     | Diamonds
 
 instance showSuit :: Show Suit where
-    show Spades = "Spades"
-    show Hearts = "Hearts"
-    show Clubs = "Clubs"
-    show Diamonds = "Diamonds"
+    show Spades     = "Spades"
+    show Hearts     = "Hearts"
+    show Clubs      = "Clubs"
+    show Diamonds   = "Diamonds"
 
 
 data CardColour
@@ -30,8 +31,8 @@ data CardColour
     | Red
 
 instance showCardColour :: Show CardColour where
-    show Black = "Black"
-    show Red = "Red"
+    show Black  = "Black"
+    show Red    = "Red"
 
 
 data Value 
@@ -131,6 +132,22 @@ splitDecktoTableauAndStock deck =
             ( range 1 7 )
 
 
+color :: Card -> CardColour
+color ( NormalCard c ) = 
+    case c.suit of 
+        Spades -> Black
+        Clubs -> Black
+        _ -> Red
+color ( Joker cardColor ) = cardColor
+
+
+cardImageUri :: Card -> String
+cardImageUri ( NormalCard c ) =
+    ( toLower $ joinWith "_" [ show c.value, show c.suit ] ) <> ".png"
+cardImageUri ( Joker _ ) =  
+    "joker.png"
+    -- ( toLower $ joinWith "_" ["joker", show col ]) <> ".png"
+
 ------------------------------------------------ UPDATE -------------------------------------------------
 
 
@@ -149,9 +166,7 @@ render :: forall cs m. State -> H.ComponentHTML Action cs m
 render _ =
     HH.div
     []
-    [ HH.img [ HP.src "./assets/joker.png" ]
-    , HH.img [ HP.src "./assets/6_spades.png" ]
-    ]
+    ( map (\card -> HH.img [ HP.src $ "./assets/" <> ( cardImageUri card) ] ) orderedDeck )
 
 
 component :: forall q i o m. H.Component q i o m
