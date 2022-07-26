@@ -1,11 +1,12 @@
 module App.Game where
 
 import Prelude
-import Data.Array (reverse, range, splitAt, (:))
-import Data.Int (toStringAs, decimal)
-import Data.Foldable (foldr)
-import Data.String (toLower, joinWith)
 
+import Data.Array (head, replicate, reverse, splitAt, (..), (:))
+import Data.Foldable (foldr)
+import Data.Int (toStringAs, decimal)
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.String (toLower, joinWith)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
@@ -73,11 +74,11 @@ type Pile = Array Card
 type State = 
     { stock         :: Pile
     -- 7 Piles with only the top card face up
-    , tableau       :: Array Pile
+    , tableau       :: Array ( Maybe Pile )
      -- a pile where cards are dealt from the stock 
     , waste         :: Pile
      -- 4 stacks of cards, one for each suit in ascending order
-    , foundations   :: Array Pile
+    , foundations   :: Array ( Maybe Pile )
     } 
 
 
@@ -86,7 +87,7 @@ initialState _ =
     { stock
     , tableau
     , waste         : []
-    , foundations   : []
+    , foundations   : replicate 4 Nothing 
     }
     where 
         { tableau, stock } = splitDecktoTableauAndStock orderedDeck
@@ -121,9 +122,9 @@ singleSuit suit =
     ]
 
 
-splitDecktoTableauAndStock :: Pile -> {tableau :: Array Pile, stock :: Pile }
+splitDecktoTableauAndStock :: Pile -> {tableau :: Array ( Maybe Pile ), stock :: Pile }
 splitDecktoTableauAndStock deck =
-    { tableau   : res.before
+    { tableau   : map Just res.before
     , stock     : res.after
     }
     where
@@ -133,7 +134,7 @@ splitDecktoTableauAndStock deck =
                         }
                     )
             { after: deck, before: [] }
-            ( range 1 7 )
+            (1..7)
 
 
 color :: Card -> CardColour
@@ -143,15 +144,6 @@ color ( NormalCard c ) =
         Clubs -> Black
         _ -> Red
 color ( Joker cardColor ) = cardColor
-
-
-cardImageUri :: Card -> String
-cardImageUri ( NormalCard c ) =
-    ( toLower $ joinWith "_" [ show c.value, show c.suit ] ) <> ".png"
-cardImageUri ( Joker _ ) =  
-    "joker.png"
-    -- ( toLower $ joinWith "_" ["joker", show col ]) <> ".png"
-
 ------------------------------------------------ UPDATE -------------------------------------------------
 
 
@@ -166,11 +158,73 @@ handleAction = case _ of
 
 ------------------------------------------------ RENDER -------------------------------------------------
 
+cardImageUri :: Card -> String
+cardImageUri ( NormalCard c ) =
+    ( toLower $ joinWith "_" [ show c.value, show c.suit, "white" ] ) <> ".png"
+cardImageUri ( Joker _ ) =  
+    "joker_white.png"
+    -- ( toLower $ joinWith "_" ["joker", show col ]) <> ".png"
+
+backCardFace :: String
+backCardFace = "back_blue_basic.png"
+
+emptySlot ::forall cs m. H.ComponentHTML Action cs m
+emptySlot =
+    HH.div [ HP.class_ $ HH.ClassName "empty-slot"] []
+
+stock :: forall cs m. Pile -> H.ComponentHTML Action cs m
+stock _ = 
+    HH.div
+        [ HP.class_ $ HH.ClassName "slot stock" ]
+        [ HH.img [ HP.src $ "./assets/" <> backCardFace ] ] 
+
+waste :: forall cs m. Pile -> H.ComponentHTML Action cs m
+waste wastePile = 
+    HH.div 
+        [ HP.class_ $ HH.ClassName "slot waste" ]
+        [ fromMaybe emptySlot ((\topCard -> HH.img [ HP.src $ "./assets/" <> ( cardImageUri $ topCard )]) <$>  ( head wastePile ))
+        ]
+
+
+foundations :: forall cs m. Array ( Maybe Pile ) -> H.ComponentHTML Action cs m
+foundations fPiles =
+    HH.div
+        [ HP.class_ $ HH.ClassName "slot foundations" ]
+        ( map 
+            (\maybePile -> 
+                fromMaybe emptySlot ((\pile -> 
+                        HH.div_ $ map (\card ->  HH.img [ HP.src $ "./assets/" <> (cardImageUri card)]
+                        ) pile
+                ) <$> maybePile )
+            ) 
+            fPiles
+        ) 
+
+tableau :: forall cs m. Array ( Maybe Pile ) -> H.ComponentHTML Action cs m
+tableau _ =
+    HH.div 
+        [ HP.class_ $ HH.ClassName "slot tableau" ]
+        [ HH.img [ HP.src $ "./assets/" <> ( cardImageUri $ NormalCard { value: Num 3, suit: Spades })]
+        ]
+
+ 
 render :: forall cs m. State -> H.ComponentHTML Action cs m
 render state =
-    HH.div
-    []
-    ( map (\card -> HH.img [ HP.src $ "./assets/" <> ( cardImageUri card) ] ) state.stock )
+    HH.div 
+        [ HP.class_ $ HH.ClassName "container" ]
+        [
+        -- Stock 
+        stock state.stock
+
+        -- waste 
+        , waste state.waste
+
+        -- Foundations
+        , foundations state.foundations
+
+        -- Tableau
+        , tableau state.tableau
+    ]
 
 
 component :: forall q i o m. H.Component q i o m
