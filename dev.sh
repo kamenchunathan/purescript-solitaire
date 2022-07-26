@@ -2,7 +2,7 @@
 npm run build && npm run serve&
 
 while true; do
-    inotifywait -e modify,create,delete -r src && 
+    inotifywait -e modify,create,delete -r src dev && 
 
     if [ "$(ps | awk '{ print $4 }' | sed -n '/node/p' | wc -l)" -gt 0 ]
     then
