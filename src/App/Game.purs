@@ -83,11 +83,15 @@ type State =
 
 initialState :: forall input. input -> State
 initialState _ =
-  { stock         : []
-  , tableau       : []
-  , waste         : []
-  , foundations   : []
-  }
+    { stock
+    , tableau
+    , waste         : []
+    , foundations   : []
+    }
+    where 
+        { tableau, stock } = splitDecktoTableauAndStock orderedDeck
+    
+
 
 
 orderedDeck :: Pile
@@ -163,10 +167,10 @@ handleAction = case _ of
 ------------------------------------------------ RENDER -------------------------------------------------
 
 render :: forall cs m. State -> H.ComponentHTML Action cs m
-render _ =
+render state =
     HH.div
     []
-    ( map (\card -> HH.img [ HP.src $ "./assets/" <> ( cardImageUri card) ] ) orderedDeck )
+    ( map (\card -> HH.img [ HP.src $ "./assets/" <> ( cardImageUri card) ] ) state.stock )
 
 
 component :: forall q i o m. H.Component q i o m
