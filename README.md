@@ -1,6 +1,6 @@
 # TODO:
 
-    >  start here next time: 8
+    >  start here next time: 7
 
 1. Derive show for the types in the game  [x]
 2. create functions for:
@@ -19,4 +19,4 @@
     - Add ability to move cards from stock to wasee by clicking waste []
     - drag and drop functionality - high priority []
     - rules for moving cards []
-8. Add CI/CD and host application somewhere -very high priority []
+8. Add CI/CD and host application somewhere -very high priority [x]
