@@ -24,5 +24,11 @@
   "bugs": {
     "url": "https://github.com/kamenchunathan/purescript-solitaire/issues"
   },
-  "homepage": "https://github.com/kamenchunathan/purescript-solitaire#readme"
+  "homepage": "https://github.com/kamenchunathan/purescript-solitaire#readme",
+  "devDependencies": {
+    "esbuild": "^0.14.51",
+    "parcel": "^2.6.2",
+    "purescript": "^0.15.4",
+    "spago": "^0.20.9"
+  }
 }
