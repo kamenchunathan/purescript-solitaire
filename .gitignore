@@ -9,3 +9,4 @@ node_modules/
 output/
 generated-docs
 prod/
+package-lock.json
