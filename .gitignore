@@ -8,3 +8,4 @@ distassets/
 node_modules/
 output/
 generated-docs
+prod/

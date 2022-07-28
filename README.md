@@ -1,5 +1,7 @@
 # TODO:
 
+    >  start here next time: 8
+
 1. Derive show for the types in the game  [x]
 2. create functions for:
     - creating a random deck / shuffling a deck  []
@@ -17,3 +19,4 @@
     - Add ability to move cards from stock to wasee by clicking waste []
     - drag and drop functionality - high priority []
     - rules for moving cards []
+8. Add CI/CD and host application somewhere -very high priority []
