@@ -1,5 +1,5 @@
 #/bin/env bash
-npm run build && npm run serve&
+npm run dev&
 
 while true; do
     inotifywait -e modify,create,delete -r src public && 
@@ -9,5 +9,5 @@ while true; do
         pkill node
     fi
 
-    npm run build && npm run serve&
+    npm run dev&
 done
