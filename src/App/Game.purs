@@ -169,7 +169,11 @@ stock :: forall cs m. Pile -> H.ComponentHTML Action cs m
 stock _ =
   HH.div
     [ HP.class_ $ HH.ClassName "slot stock" ]
-    [ HH.img [ HP.src $ "./assets/" <> backCardFace ] ]
+    [ HH.img
+        [ HP.draggable true
+        , HP.src $ "./assets/" <> backCardFace
+        ]
+    ]
 
 waste :: forall cs m. Pile -> H.ComponentHTML Action cs m
 waste wastePile =
