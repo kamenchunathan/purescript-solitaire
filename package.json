@@ -1,21 +1,20 @@
 {
   "private": true,
   "devDependencies": {
-    "esbuild": "^0.14.50",
-    "parcel": "2.5.0",
-    "parcel-reporter-static-files-copy": "^1.3.4",
+    "concurrently": "^7.6.0",
     "purescript": "0.15.0",
-    "spago": "^0.19.1"
+    "spago": "^0.19.1",
+    "tailwindcss": "^3.2.4",
+    "vite": "^4.0.4"
   },
   "scripts": {
-    "build": "spago build",
+    "dev": "concurrently \"vite\" \"pnpm run dev:tailwind\"",
+    "dev:tailwind": "tailwindcss -i src/style.css -o public/style.css --watch",
+    "build:purescript": "spago build",
+    "build:tailwind": "tailwindcss -i src/style.css -o public/style.css --minify",
+    "build": "pnpm run build:tailwind && pnpm run build:purescript",
     "test": "spago test",
     "clean": "rm -rf node_modules output dce-output .spago dist/* *.lock .cache",
-    "serve": "parcel dev/index.html",
-    "repl": "spago repl",
-    "build-prod": "mkdir -p prod && cp dev/* prod/ && rm -rf dist && spago bundle-app --to prod/index.js && parcel build prod/index.html"
-  },
-  "staticFiles": {
-    "staticPath": "./static"
+    "repl": "spago repl"
   }
 }
