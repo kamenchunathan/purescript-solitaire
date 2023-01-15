@@ -137,7 +137,7 @@ data Action = NoOp
 
 handleAction :: forall cs o m. Action → H.HalogenM State Action cs o m Unit
 handleAction = case _ of
-  _ -> H.modify_ initialState
+  _ -> pure unit
 
 ------------------------------------------------ RENDER -------------------------------------------------
 
