@@ -9,8 +9,8 @@
     "dev": "concurrently \"npm run dev:tailwind\" \"npx vite\"",
     "dev:tailwind": "npx tailwindcss -i ./src/main.css -o  ./public/main.css --watch",
     "build": "npm run build:purescript && npm run build:tailwind && tsc && vite build",
-    "build:tailwind": "npx tailwindcss -i ./src/main.css -o  ./public/main.css --minify",
-    "build:purescript": "npx spago build",
+    "build:tailwind": "tailwindcss -i ./src/main.css -o  ./public/main.css --minify",
+    "build:purescript": "spago build",
     "spago": "spago",
     "clean": "rm -rf node_modules output dce-output .spago dist/* *.lock *.cache"
   },
