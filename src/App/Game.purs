@@ -8,11 +8,13 @@ import Data.Int (toStringAs, decimal)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (toLower, joinWith)
 import Effect.Class (class MonadEffect)
-import Effect.Class.Console (log, logShow)
+import Effect.Console (log)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Web.Event.Event (preventDefault)
+import Web.HTML.Event.DragEvent (DragEvent, toEvent)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
 ------------------------------------------------ MODEL -------------------------------------------------
@@ -139,18 +141,26 @@ color (Joker cardColor) = cardColor
 
 data Action
   = NoOp
-  | DragStart
-  | DragOver
+  | DragStart DragEvent
+  | DragEnter DragEvent
+  | DragOver DragEvent
+  | DropCard DragEvent
   | DealFromStock MouseEvent
 
 handleAction :: forall output m. MonadEffect m => Action → H.HalogenM State Action () output m Unit
 handleAction = case _ of
-  DragStart ->
-    do
+  DragStart _ ->
+    H.liftEffect do
       --TODO: temporary effect which should be replaced with behaviour expecteded on dragging over the pile
       H.liftEffect $ log "drag start"
 
-  DragOver -> H.liftEffect $ log "drag over"
+  DragOver e -> H.liftEffect $ preventDefault $ toEvent e
+
+  DragEnter e -> H.liftEffect do
+    preventDefault $ toEvent e
+    log "drag enter"
+
+  DropCard _ -> H.liftEffect $ log "dropping"
 
   DealFromStock _ -> do
     H.modify_
@@ -162,14 +172,9 @@ handleAction = case _ of
               }
             _ -> s
               { stock = fromMaybe [] $ tail s.stock
-              , waste = fromMaybe [] $ map (\m ->   m : s.waste) (head s.stock)
+              , waste = fromMaybe [] $ map (\m -> m : s.waste) (head s.stock)
               }
-              where prevWaste = s.waste
       )
-    -- st <- H.get
-    -- logShow st.stock
-    -- logShow st.waste
- 
 
   NoOp -> pure unit
 
@@ -223,9 +228,16 @@ foundations fPiles =
     [ HP.class_ $ HH.ClassName "foundations slot" ]
     ( map
         ( \maybePile ->
+          -- TODO fix: the empty slot should only be a graphic and should not take away functionaltiy
+          -- of the pile as it does now
             fromMaybe emptySlot
               ( ( \pile ->
-                    HH.div_ $ map
+                    HH.div
+                      [ HE.onDragEnter DragEnter
+                      , HE.onDragOver DragOver
+                      , HE.onDrop DropCard
+
+                      ] $ map
                       ( \card -> HH.img [ HP.src $ "./assets/" <> (cardImageUri card) ]
                       )
                       pile
@@ -246,12 +258,16 @@ tableau tPiles =
             ( ( \pile ->
                   HH.div
                     [ HP.class_ $ HH.ClassName "tableau-pile"
-                    , HE.onDragOver (\_ -> DragOver)
+                    , HE.onDragEnter DragEnter
+                    , HE.onDragOver DragOver
+                    , HE.onDrop DropCard
                     ]
                     ( map
                         ( \card ->
                             HH.div
-                              [ HP.draggable true, HE.onDragStart (\_ -> DragStart) ]
+                              [ HP.draggable true
+                              , HE.onDragStart DragStart
+                              ]
                               [ HH.img [ HP.src $ "./assets/" <> (cardImageUri card), HP.draggable false ] ]
                         )
                         pile

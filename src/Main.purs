@@ -3,7 +3,6 @@ module Main where
 import Prelude
 
 import App.Game as Game
-import Effect.Class.Console (log)
 import Effect (Effect)
 import Halogen.Aff as HA
 import Halogen.VDom.Driver (runUI)

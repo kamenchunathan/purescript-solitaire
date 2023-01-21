@@ -9,6 +9,8 @@
   , "maybe"
   , "prelude"
   , "strings"
+  , "web-events"
+  , "web-html"
   , "web-uievents"
   ]
 , packages = ./packages.dhall
