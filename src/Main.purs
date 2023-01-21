@@ -10,6 +10,5 @@ import Halogen.VDom.Driver (runUI)
 
 main :: Effect Unit
 main = HA.runHalogenAff do
-  log "maajabu haya"
   body <- HA.awaitBody
   runUI Game.component unit body

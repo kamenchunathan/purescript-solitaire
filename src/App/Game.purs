@@ -2,17 +2,18 @@ module App.Game where
 
 import Prelude
 
-import Data.Array (head, replicate, reverse, splitAt, (..), (:))
+import Data.Array (head, replicate, reverse, splitAt, tail, (..), (:))
 import Data.Foldable (foldr)
 import Data.Int (toStringAs, decimal)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (toLower, joinWith)
-import Effect.Console (log)
 import Effect.Class (class MonadEffect)
+import Effect.Class.Console (log, logShow)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Web.UIEvent.MouseEvent (MouseEvent)
 
 ------------------------------------------------ MODEL -------------------------------------------------
 
@@ -139,14 +140,38 @@ color (Joker cardColor) = cardColor
 data Action
   = NoOp
   | DragStart
+  | DragOver
+  | DealFromStock MouseEvent
 
 handleAction :: forall output m. MonadEffect m => Action → H.HalogenM State Action () output m Unit
 handleAction = case _ of
   DragStart ->
     do
       --TODO: temporary effect which should be replaced with behaviour expecteded on dragging over the pile
-      H.liftEffect $ log "Wow"
-  NoOp -> H.modify_ initialState
+      H.liftEffect $ log "drag start"
+
+  DragOver -> H.liftEffect $ log "drag over"
+
+  DealFromStock _ -> do
+    H.modify_
+      ( \s ->
+          case s.stock of
+            [] -> s
+              { stock = reverse s.waste
+              , waste = []
+              }
+            _ -> s
+              { stock = fromMaybe [] $ tail s.stock
+              , waste = fromMaybe [] $ map (\m ->   m : s.waste) (head s.stock)
+              }
+              where prevWaste = s.waste
+      )
+    -- st <- H.get
+    -- logShow st.stock
+    -- logShow st.waste
+ 
+
+  NoOp -> pure unit
 
 ------------------------------------------------ RENDER -------------------------------------------------
 
@@ -165,13 +190,23 @@ emptySlot :: forall cs m. H.ComponentHTML Action cs m
 emptySlot =
   HH.div [ HP.class_ $ HH.ClassName "empty-slot" ] []
 
-stock :: forall cs m. Pile -> H.ComponentHTML Action cs m
-stock _ =
+renderStock :: forall cs m. Pile -> H.ComponentHTML Action cs m
+renderStock [] =
   HH.div
-    [ HP.class_ $ HH.ClassName "slot stock" ]
+    [ HP.class_ $ HH.ClassName "slot stock"
+    , HE.onClick DealFromStock
+    ]
+    [ emptySlot ]
+
+renderStock _ =
+  HH.div
+    [ HP.class_ $ HH.ClassName "slot stock"
+    , HP.draggable false
+    , HE.onClick DealFromStock
+    ]
     [ HH.img
-        [ HP.draggable true
-        , HP.src $ "./assets/" <> backCardFace
+        [ HP.draggable false
+        , HP.src $ "./assets/" <> (backCardFace)
         ]
     ]
 
@@ -210,13 +245,13 @@ tableau tPiles =
         ( \maybePile -> fromMaybe emptySlot
             ( ( \pile ->
                   HH.div
-                    [ HP.class_ $ HH.ClassName "tableau-pile" ]
+                    [ HP.class_ $ HH.ClassName "tableau-pile"
+                    , HE.onDragOver (\_ -> DragOver)
+                    ]
                     ( map
                         ( \card ->
                             HH.div
-                              [ HP.draggable true
-                              , HE.onDragStart (\_ -> DragStart)
-                              ]
+                              [ HP.draggable true, HE.onDragStart (\_ -> DragStart) ]
                               [ HH.img [ HP.src $ "./assets/" <> (cardImageUri card), HP.draggable false ] ]
                         )
                         pile
@@ -233,7 +268,7 @@ render state =
     [ HP.class_ $ HH.ClassName "container" ]
     [
       -- Stock 
-      stock state.stock
+      renderStock state.stock
 
     -- waste 
     , waste state.waste
