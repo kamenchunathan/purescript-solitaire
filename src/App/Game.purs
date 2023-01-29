@@ -72,7 +72,7 @@ type Pile = Array Card
 type State =
   { stock :: Pile
   -- 7 Piles with only the top card face up
-  , tableau :: Array (Maybe Pile)
+  , tableau :: Array Pile
   -- a pile where cards are dealt from the stock 
   , waste :: Pile
   -- 4 stacks of cards, one for each suit in ascending order
@@ -114,9 +114,9 @@ singleSuit suit =
   , NormalCard { value: King, suit: suit }
   ]
 
-splitDecktoTableauAndStock :: Pile -> { tableau :: Array (Maybe Pile), stock :: Pile }
+splitDecktoTableauAndStock :: Pile -> { tableau :: Array Pile, stock :: Pile }
 splitDecktoTableauAndStock deck =
-  { tableau: map Just res.before
+  { tableau: res.before
   , stock: res.after
   }
   where
@@ -228,8 +228,8 @@ foundations fPiles =
     [ HP.class_ $ HH.ClassName "foundations slot" ]
     ( map
         ( \maybePile ->
-          -- TODO fix: the empty slot should only be a graphic and should not take away functionaltiy
-          -- of the pile as it does now
+            -- TODO fix: the empty slot should only be a graphic and should not take away functionaltiy
+            -- of the pile as it does now
             fromMaybe emptySlot
               ( ( \pile ->
                     HH.div
@@ -247,33 +247,30 @@ foundations fPiles =
         fPiles
     )
 
-tableau :: forall cs m. Array (Maybe Pile) -> H.ComponentHTML Action cs m
-tableau tPiles =
+renderTableau :: forall cs m. Array Pile -> H.ComponentHTML Action cs m
+renderTableau tPiles =
   HH.div
     [ HP.class_ $ HH.ClassName "slot tableau"
     , HP.style "align-items: start;"
     ]
     ( map
-        ( \maybePile -> fromMaybe emptySlot
-            ( ( \pile ->
-                  HH.div
-                    [ HP.class_ $ HH.ClassName "tableau-pile"
-                    , HE.onDragEnter DragEnter
-                    , HE.onDragOver DragOver
-                    , HE.onDrop DropCard
-                    ]
-                    ( map
-                        ( \card ->
-                            HH.div
-                              [ HP.draggable true
-                              , HE.onDragStart DragStart
-                              ]
-                              [ HH.img [ HP.src $ "./assets/" <> (cardImageUri card), HP.draggable false ] ]
-                        )
-                        pile
-                    )
-              ) <$> maybePile
-            )
+        ( \pile ->
+            HH.div
+              [ HP.class_ $ HH.ClassName "tableau-pile"
+              , HE.onDragEnter DragEnter
+              , HE.onDragOver DragOver
+              , HE.onDrop DropCard
+              ]
+              ( map
+                  ( \card ->
+                      HH.div
+                        [ HP.draggable true
+                        , HE.onDragStart DragStart
+                        ]
+                        [ HH.img [ HP.src $ "./assets/" <> (cardImageUri card), HP.draggable false ] ]
+                  )
+                  pile
+              )
         )
         tPiles
     )
@@ -293,7 +290,7 @@ render state =
     , foundations state.foundations
 
     -- Tableau
-    , tableau state.tableau
+    , renderTableau state.tableau
     ]
 
 component :: forall query input output m. MonadEffect m => H.Component query input output m
