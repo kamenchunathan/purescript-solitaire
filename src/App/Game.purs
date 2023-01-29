@@ -7,6 +7,7 @@ import Data.Foldable (foldr)
 import Data.Int (toStringAs, decimal)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (toLower, joinWith)
+import Data.Tuple (Tuple(..))
 import Effect.Class (class MonadEffect)
 import Effect.Console (log)
 import Halogen as H
@@ -72,7 +73,7 @@ type Pile = Array Card
 type State =
   { stock :: Pile
   -- 7 Piles with only the top card face up
-  , tableau :: Array Pile
+  , tableau :: Array (Array (Tuple Card Boolean))
   -- a pile where cards are dealt from the stock 
   , waste :: Pile
   -- 4 stacks of cards, one for each suit in ascending order
@@ -82,12 +83,19 @@ type State =
 initialState :: forall input. input -> State
 initialState _ =
   { stock
-  , tableau
+  , tableau: map flippedTopCard tableau
   , waste: []
   , foundations: replicate 4 Nothing
   }
   where
   { tableau, stock } = splitDecktoTableauAndStock orderedDeck
+
+flippedTopCard :: Pile -> Array (Tuple Card Boolean)
+flippedTopCard [] = []
+flippedTopCard cards =
+  append
+    (fromMaybe [] $ map (\topCard -> [ Tuple topCard true ]) (head $ reverse cards))
+    (fromMaybe [] $ map (\rest -> map (\card -> Tuple card false) rest) (tail $ reverse cards))
 
 orderedDeck :: Pile
 orderedDeck =
@@ -247,32 +255,40 @@ foundations fPiles =
         fPiles
     )
 
-renderTableau :: forall cs m. Array Pile -> H.ComponentHTML Action cs m
+renderTableau :: forall cs m. Array (Array (Tuple Card Boolean)) -> H.ComponentHTML Action cs m
 renderTableau tPiles =
   HH.div
     [ HP.class_ $ HH.ClassName "slot tableau"
     , HP.style "align-items: start;"
     ]
+    (map renderPile tPiles)
+
+renderPile :: forall cs m. Array (Tuple Card Boolean) -> H.ComponentHTML Action cs m
+renderPile [] = HH.div [] [ emptySlot ]
+renderPile pile =
+  HH.div
+    [ HP.class_ $ HH.ClassName "tableau-pile"
+    , HE.onDragEnter DragEnter
+    , HE.onDragOver DragOver
+    , HE.onDrop DropCard
+    ]
     ( map
-        ( \pile ->
-            HH.div
-              [ HP.class_ $ HH.ClassName "tableau-pile"
-              , HE.onDragEnter DragEnter
-              , HE.onDragOver DragOver
-              , HE.onDrop DropCard
-              ]
-              ( map
-                  ( \card ->
-                      HH.div
-                        [ HP.draggable true
-                        , HE.onDragStart DragStart
-                        ]
-                        [ HH.img [ HP.src $ "./assets/" <> (cardImageUri card), HP.draggable false ] ]
-                  )
-                  pile
-              )
+        ( \(Tuple card flipped) ->
+            case flipped of
+              true ->
+                HH.div
+                  [ HP.draggable true
+                  , HE.onDragStart DragStart
+                  ]
+                  [ HH.img [ HP.src $ "./assets/" <> (cardImageUri card), HP.draggable false ] ]
+              false -> HH.div
+                [ HP.draggable false
+                , HE.onDragStart DragStart
+                ]
+                [ HH.img [ HP.draggable false, HP.src $ "./assets/" <> (backCardFace) ] ]
+
         )
-        tPiles
+        (reverse pile)
     )
 
 render :: forall cs m. State -> H.ComponentHTML Action cs m
