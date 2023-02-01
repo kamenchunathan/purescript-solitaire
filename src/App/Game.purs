@@ -2,7 +2,7 @@ module App.Game where
 
 import Prelude
 
-import Data.Array (head, mapWithIndex, replicate, reverse, splitAt, tail, (..), (:))
+import Data.Array (head, index, mapWithIndex, replicate, reverse, splitAt, tail, (..), (:))
 import Data.Foldable (foldr)
 import Data.Int (decimal, toStringAs)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -78,6 +78,8 @@ type State =
   , waste :: Pile
   -- 4 stacks of cards, one for each suit in ascending order
   , foundations :: Array Pile
+  -- Card currently being dragged
+  , dragTarget :: Maybe { card :: Card, id :: Id }
   }
 
 initialState :: forall input. input -> State
@@ -86,6 +88,7 @@ initialState _ =
   , tableau: map flippedTopCard tableau
   , waste: []
   , foundations: replicate 4 []
+  , dragTarget: Nothing
   }
   where
   { tableau, stock } = splitDecktoTableauAndStock orderedDeck
@@ -166,14 +169,50 @@ data Action
 
 handleAction :: forall output m. MonadEffect m => Action → H.HalogenM State Action () output m Unit
 handleAction = case _ of
-  DragStart id _ -> H.liftEffect do
-    log $ "drag start " <> (show id)
+  DragStart id _ -> do
+    H.liftEffect $ log $ "drag start " <> (show id)
+    H.modify_
+      ( \st ->
+          st
+            { dragTarget = do
+                card <- case id of
+                  FoundationId i -> do
+                    pile <- index st.foundations i
+                    head pile
 
-  DragOver i e -> H.liftEffect $ preventDefault $ toEvent e
+                  TableauId i -> do
+                    pile <- index st.tableau i
+                    (Tuple card _) <- head pile
+                    pure card
 
-  DragEnter i e -> H.liftEffect do
+                  Waste -> head st.waste
+
+                pure { id, card }
+            }
+      )
+
+  DragEnter _ e -> H.liftEffect do
     preventDefault $ toEvent e
     log "drag enter"
+
+  DragOver (TableauId i) e  -> do
+    { dragTarget } <- H.get
+    case dragTarget of
+      Just { id: (TableauId targetId), card } | targetId == i -> pure unit
+      _ -> H.liftEffect do
+        preventDefault $ toEvent e
+        logShow dragTarget
+        
+  DragOver (FoundationId i) e  -> do
+    { dragTarget } <- H.get
+    case dragTarget of
+      Just { id: (FoundationId targetId), card } | targetId == i -> pure unit
+      _ -> H.liftEffect do
+        preventDefault $ toEvent e
+        logShow dragTarget
+
+  DragOver Waste _ -> pure unit
+  -- DragOver (TableauId i) e -> H.liftEffect do
 
   DropCard i _ -> do
     H.liftEffect $ logShow i
@@ -238,8 +277,8 @@ renderWaste wastePile =
     [ fromMaybe emptySlot ((\topCard -> HH.img [ HP.src $ "./assets/" <> (cardImageUri $ topCard) ]) <$> (head wastePile))
     ]
 
-foundations :: forall cs m. Array Pile -> H.ComponentHTML Action cs m
-foundations fPiles =
+renderFoundations :: forall cs m. Array Pile -> H.ComponentHTML Action cs m
+renderFoundations fPiles =
   HH.div
     [ HP.class_ $ HH.ClassName "foundations slot" ]
     ( mapWithIndex
@@ -254,7 +293,7 @@ foundations fPiles =
                       ( \card ->
                           HH.img [ HP.draggable false, HP.src $ "./assets/" <> (cardImageUri card) ]
                       )
-                  $ head pile 
+                  $ head pile
               ]
         )
         fPiles
@@ -293,6 +332,7 @@ renderPile i pile =
                   [ HH.img [ HP.src $ "./assets/" <> (cardImageUri card), HP.draggable false ] ]
               false -> HH.div
                 [ HP.draggable false
+                -- , HP.selectable false
                 , HE.onDragStart $ DragStart $ TableauId i
                 ]
                 [ HH.img [ HP.draggable false, HP.src $ "./assets/" <> (backCardFace) ] ]
@@ -313,7 +353,7 @@ render state =
     , renderWaste state.waste
 
     -- Foundations
-    , foundations state.foundations
+    , renderFoundations state.foundations
 
     -- Tableau
     , renderTableau state.tableau
