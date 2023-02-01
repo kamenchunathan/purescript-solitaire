@@ -229,8 +229,8 @@ renderStock _ =
         ]
     ]
 
-waste :: forall cs m. Pile -> H.ComponentHTML Action cs m
-waste wastePile =
+renderWaste :: forall cs m. Pile -> H.ComponentHTML Action cs m
+renderWaste wastePile =
   HH.div
     [ HP.class_ $ HH.ClassName "slot waste" ]
     [ fromMaybe emptySlot ((\topCard -> HH.img [ HP.src $ "./assets/" <> (cardImageUri $ topCard) ]) <$> (head wastePile))
@@ -308,7 +308,7 @@ render state =
       renderStock state.stock
 
     -- waste 
-    , waste state.waste
+    , renderWaste state.waste
 
     -- Foundations
     , foundations state.foundations
