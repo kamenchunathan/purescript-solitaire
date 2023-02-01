@@ -6,7 +6,7 @@
     "test": "test"
   },
   "scripts": {
-    "dev": "concurrently \"pnpm run dev:tailwind\" \"npx vite\"",
+    "dev": "concurrently \"pnpm run dev:tailwind\" \"vite\"",
     "dev:tailwind": "tailwindcss -i ./src/main.css -o  ./public/main.css --watch",
     "build": "pnpm run build:purescript && npm run build:tailwind && tsc && vite build",
     "build:tailwind": "tailwindcss -i ./src/main.css -o  ./public/main.css --minify",
