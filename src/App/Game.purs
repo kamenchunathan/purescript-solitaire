@@ -149,10 +149,12 @@ color (Joker cardColor) = cardColor
 data Id
   = FoundationId Int
   | TableauId Int
+  | Waste
 
 instance showId :: Show Id where
   show (FoundationId id) = "foundation " <> (toStringAs decimal id)
   show (TableauId id) = "tableau " <> (toStringAs decimal id)
+  show Waste = "waste"
 
 data Action
   = NoOp
