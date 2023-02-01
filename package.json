@@ -30,16 +30,14 @@
   "homepage": "https://github.com/kamenchunathan/purescript-solitaire#readme",
   "devDependencies": {
     "concurrently": "^7.3.0",
-    "purescript": "^0.15.4",
+    "purescript": "0.15.4",
     "spago": "^0.20.9",
     "tailwindcss": "^3.1.8",
+    "typescript": "^4.9.5",
     "vite": "^3.1.8"
   },
   "staticFiles": {
     "staticPath": "public/assets",
     "distDir": "dist/assets"
-  },
-  "dependencies": {
-    "typescript": "^4.8.4"
   }
 }
