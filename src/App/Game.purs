@@ -2,14 +2,14 @@ module App.Game where
 
 import Prelude
 
-import Data.Array (head, replicate, reverse, splitAt, tail, (..), (:))
+import Data.Array (head, mapWithIndex, replicate, reverse, splitAt, tail, (..), (:))
 import Data.Foldable (foldr)
-import Data.Int (toStringAs, decimal)
+import Data.Int (decimal, toStringAs)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (toLower, joinWith)
 import Data.Tuple (Tuple(..))
 import Effect.Class (class MonadEffect)
-import Effect.Console (log)
+import Effect.Console (log, logShow)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -146,29 +146,35 @@ color (NormalCard c) =
 color (Joker cardColor) = cardColor
 
 ------------------------------------------------ UPDATE -------------------------------------------------
+data Id
+  = FoundationId Int
+  | TableauId Int
+
+instance showId :: Show Id where
+  show (FoundationId id) = "foundation " <> (toStringAs decimal id)
+  show (TableauId id) = "tableau " <> (toStringAs decimal id)
 
 data Action
   = NoOp
-  | DragStart DragEvent
-  | DragEnter DragEvent
-  | DragOver DragEvent
-  | DropCard DragEvent
+  | DragStart Id DragEvent
+  | DragEnter Id DragEvent
+  | DragOver Id DragEvent
+  | DropCard Id DragEvent
   | DealFromStock MouseEvent
 
 handleAction :: forall output m. MonadEffect m => Action → H.HalogenM State Action () output m Unit
 handleAction = case _ of
-  DragStart _ ->
-    H.liftEffect do
-      --TODO: temporary effect which should be replaced with behaviour expecteded on dragging over the pile
-      H.liftEffect $ log "drag start"
+  DragStart id _ -> H.liftEffect do
+    log $ "drag start " <> (show id)
 
-  DragOver e -> H.liftEffect $ preventDefault $ toEvent e
+  DragOver i e -> H.liftEffect $ preventDefault $ toEvent e
 
-  DragEnter e -> H.liftEffect do
+  DragEnter i e -> H.liftEffect do
     preventDefault $ toEvent e
     log "drag enter"
 
-  DropCard _ -> H.liftEffect $ log "dropping"
+  DropCard i _ -> do
+    H.liftEffect $ logShow i
 
   DealFromStock _ -> do
     H.modify_
@@ -234,23 +240,20 @@ foundations :: forall cs m. Array (Maybe Pile) -> H.ComponentHTML Action cs m
 foundations fPiles =
   HH.div
     [ HP.class_ $ HH.ClassName "foundations slot" ]
-    ( map
-        ( \maybePile ->
-            -- TODO fix: the empty slot should only be a graphic and should not take away functionaltiy
-            -- of the pile as it does now
-            fromMaybe emptySlot
-              ( ( \pile ->
-                    HH.div
-                      [ HE.onDragEnter DragEnter
-                      , HE.onDragOver DragOver
-                      , HE.onDrop DropCard
-
-                      ] $ map
-                      ( \card -> HH.img [ HP.src $ "./assets/" <> (cardImageUri card) ]
+    ( mapWithIndex
+        ( \i maybePile ->
+            HH.div
+              [ HE.onDragEnter $ DragEnter $ FoundationId i
+              , HE.onDragOver $ DragOver $ FoundationId i
+              , HE.onDrop $ DropCard $ FoundationId i
+              ]
+              [ fromMaybe emptySlot
+                  $ map
+                      ( \card ->
+                          HH.img [ HP.draggable false, HP.src $ "./assets/" <> (cardImageUri card) ]
                       )
-                      pile
-                ) <$> maybePile
-              )
+                  $ bind maybePile head
+              ]
         )
         fPiles
     )
@@ -261,16 +264,21 @@ renderTableau tPiles =
     [ HP.class_ $ HH.ClassName "slot tableau"
     , HP.style "align-items: start;"
     ]
-    (map renderPile tPiles)
+    (mapWithIndex renderPile tPiles)
 
-renderPile :: forall cs m. Array (Tuple Card Boolean) -> H.ComponentHTML Action cs m
-renderPile [] = HH.div [] [ emptySlot ]
-renderPile pile =
+renderPile :: forall cs m. Int -> Array (Tuple Card Boolean) -> H.ComponentHTML Action cs m
+renderPile i [] = HH.div
+  [ HE.onDragEnter $ DragEnter $ TableauId i
+  , HE.onDragOver $ DragOver $ TableauId i
+  , HE.onDrop $ DropCard $ TableauId i
+  ]
+  [ emptySlot ]
+renderPile i pile =
   HH.div
     [ HP.class_ $ HH.ClassName "tableau-pile"
-    , HE.onDragEnter DragEnter
-    , HE.onDragOver DragOver
-    , HE.onDrop DropCard
+    , HE.onDragEnter $ DragEnter $ TableauId i
+    , HE.onDragOver $ DragOver $ TableauId i
+    , HE.onDrop $ DropCard $ TableauId i
     ]
     ( map
         ( \(Tuple card flipped) ->
@@ -278,12 +286,12 @@ renderPile pile =
               true ->
                 HH.div
                   [ HP.draggable true
-                  , HE.onDragStart DragStart
+                  , HE.onDragStart $ DragStart $ TableauId i
                   ]
                   [ HH.img [ HP.src $ "./assets/" <> (cardImageUri card), HP.draggable false ] ]
               false -> HH.div
                 [ HP.draggable false
-                , HE.onDragStart DragStart
+                , HE.onDragStart $ DragStart $ TableauId i
                 ]
                 [ HH.img [ HP.draggable false, HP.src $ "./assets/" <> (backCardFace) ] ]
 
