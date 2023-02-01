@@ -6,9 +6,9 @@
     "test": "test"
   },
   "scripts": {
-    "dev": "concurrently \"npm run dev:tailwind\" \"npx vite\"",
-    "dev:tailwind": "npx tailwindcss -i ./src/main.css -o  ./public/main.css --watch",
-    "build": "npm run build:purescript && npm run build:tailwind && tsc && vite build",
+    "dev": "concurrently \"pnpm run dev:tailwind\" \"npx vite\"",
+    "dev:tailwind": "tailwindcss -i ./src/main.css -o  ./public/main.css --watch",
+    "build": "pnpm run build:purescript && npm run build:tailwind && tsc && vite build",
     "build:tailwind": "tailwindcss -i ./src/main.css -o  ./public/main.css --minify",
     "build:purescript": "spago build",
     "spago": "spago",
