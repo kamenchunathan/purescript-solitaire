@@ -9,6 +9,7 @@
   , "maybe"
   , "prelude"
   , "strings"
+  , "tuples"
   , "web-events"
   , "web-html"
   , "web-uievents"
