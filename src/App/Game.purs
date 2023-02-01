@@ -77,7 +77,7 @@ type State =
   -- a pile where cards are dealt from the stock 
   , waste :: Pile
   -- 4 stacks of cards, one for each suit in ascending order
-  , foundations :: Array (Maybe Pile)
+  , foundations :: Array Pile
   }
 
 initialState :: forall input. input -> State
@@ -85,7 +85,7 @@ initialState _ =
   { stock
   , tableau: map flippedTopCard tableau
   , waste: []
-  , foundations: replicate 4 Nothing
+  , foundations: replicate 4 []
   }
   where
   { tableau, stock } = splitDecktoTableauAndStock orderedDeck
@@ -238,12 +238,12 @@ renderWaste wastePile =
     [ fromMaybe emptySlot ((\topCard -> HH.img [ HP.src $ "./assets/" <> (cardImageUri $ topCard) ]) <$> (head wastePile))
     ]
 
-foundations :: forall cs m. Array (Maybe Pile) -> H.ComponentHTML Action cs m
+foundations :: forall cs m. Array Pile -> H.ComponentHTML Action cs m
 foundations fPiles =
   HH.div
     [ HP.class_ $ HH.ClassName "foundations slot" ]
     ( mapWithIndex
-        ( \i maybePile ->
+        ( \i pile ->
             HH.div
               [ HE.onDragEnter $ DragEnter $ FoundationId i
               , HE.onDragOver $ DragOver $ FoundationId i
@@ -254,7 +254,7 @@ foundations fPiles =
                       ( \card ->
                           HH.img [ HP.draggable false, HP.src $ "./assets/" <> (cardImageUri card) ]
                       )
-                  $ bind maybePile head
+                  $ head pile 
               ]
         )
         fPiles
