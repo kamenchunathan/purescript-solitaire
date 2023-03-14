@@ -10,7 +10,6 @@ import Data.String (toLower, joinWith)
 import Data.Traversable (sequence)
 import Data.Tuple (Tuple(..))
 import Effect (foreachE)
-import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
 import Effect.Console (log, logShow)
 import Halogen as H
@@ -86,7 +85,7 @@ type State =
   -- 4 stacks of cards, one for each suit in ascending order
   , foundations :: Array Pile
   -- Card currently being dragged and the id of the origin pile
-  , dragTarget :: Maybe { card :: Card, id :: CardId }
+  , dragTarget :: Maybe { card :: Card, cardId :: CardId }
   }
 
 initialState :: forall input. input -> State
@@ -188,7 +187,7 @@ loadImages = H.liftEffect $
 handleAction :: forall output m. MonadEffect m => Action → H.HalogenM State Action () output m Unit
 handleAction = case _ of
   LoadImages -> loadImages
-  DragStart id de -> do
+  DragStart cardId de -> do
     -- FIXME(nathan): When cache is disabled drag image is not set properly.
     --    Something to do with fetching the image first. This is ideally should
     --    not be a problem when dragging for the first time because image is
@@ -197,9 +196,9 @@ handleAction = case _ of
     --    in advance or storing a reference to the image
     -- draggedCard <- H.gets $ (map $ cardImageUri <<< _.card) <<< _.dragTarget
     state <- H.get
-    let draggedCardUri = map (cardImageUri <<< _.card) $ getDragTarget id state
+    let draggedCardUri = map (cardImageUri <<< _.card) $ getDragTarget cardId state
     H.liftEffect do
-      log $ "drag start " <> (show id)
+      log $ "drag start " <> (show cardId)
       img <- create
       -- TODO: the result of this is a maybe that indicates whether the operation
       --    was successfull. Use it for something
@@ -208,13 +207,13 @@ handleAction = case _ of
 
     -- H.modify_
     --   ( \st ->
-    --       case id of
+    --       case cardId of
     --         FoundationId i ->
     --           st
     --             { dragTarget = do
     --                 pile <- index st.foundations i
     --                 card <- head pile
-    --                 pure { card, id }
+    --                 pure { card, cardId }
     --             , foundations = fromMaybe [] do
     --                 pile <- index st.foundations i
     --                 _ <- tail pile
@@ -225,7 +224,7 @@ handleAction = case _ of
     --             { dragTarget = do
     --                 pile <- index st.tableau i
     --                 (Tuple card _) <- head pile
-    --                 pure { card, id }
+    --                 pure { card, cardId }
     --             , tableau =
     --                 mapWithIndex
     --                   (\j x -> if i == j then fromMaybe [] $ tail x else x)
@@ -234,7 +233,7 @@ handleAction = case _ of
     --         Waste -> st
     --           { dragTarget = do
     --               card <- head st.waste
-    --               pure { card, id }
+    --               pure { card, cardId }
     --           }
     --   )
 
@@ -245,13 +244,13 @@ handleAction = case _ of
   DragOver (TableauId i) e -> do
     { dragTarget } <- H.get
     case dragTarget of
-      Just { id: (TableauId targetId) } | targetId == i -> pure unit
+      Just { cardId: (TableauId targetId) } | targetId == i -> pure unit
       _ -> H.liftEffect $ preventDefault $ toEvent e
 
   DragOver (FoundationId i) e -> do
     { dragTarget } <- H.get
     case dragTarget of
-      Just { id: (FoundationId targetId) } | targetId == i -> pure unit
+      Just { cardId: (FoundationId targetId) } | targetId == i -> pure unit
       _ -> H.liftEffect do
         preventDefault $ toEvent e
 
