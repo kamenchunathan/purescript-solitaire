@@ -7,7 +7,10 @@ import Data.Foldable (foldr)
 import Data.Int (decimal, toStringAs)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (toLower, joinWith)
+import Data.Traversable (sequence)
 import Data.Tuple (Tuple(..))
+import Effect (foreachE)
+import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
 import Effect.Console (log, logShow)
 import Halogen as H
@@ -15,10 +18,14 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Web.Event.Event (preventDefault)
-import Web.HTML.Event.DragEvent (DragEvent, toEvent)
+import Web.HTML.Event.DataTransfer (setDragImage)
+import Web.HTML.Event.DragEvent (DragEvent, dataTransfer, toEvent)
+import Web.HTML.HTMLImageElement (create, setSrc, toElement)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
+--------------------------------------------------------------------------------------------------------
 ------------------------------------------------ MODEL -------------------------------------------------
+--------------------------------------------------------------------------------------------------------
 
 data Suit
   = Spades
@@ -72,13 +79,13 @@ type Pile = Array Card
 
 type State =
   { stock :: Pile
-  -- 7 Piles with only the top card face up
+  -- 7 Piles with only the top card face up. Boolean shows if the card is flipped
   , tableau :: Array (Array (Tuple Card Boolean))
   -- a pile where cards are dealt from the stock 
   , waste :: Pile
   -- 4 stacks of cards, one for each suit in ascending order
   , foundations :: Array Pile
-  -- Card currently being dragged
+  -- Card currently being dragged and the id of the origin pile
   , dragTarget :: Maybe { card :: Card, id :: Id }
   }
 
@@ -161,58 +168,98 @@ instance showId :: Show Id where
 
 data Action
   = NoOp
+  | LoadImages
   | DragStart Id DragEvent
   | DragEnter Id DragEvent
   | DragOver Id DragEvent
+  | DragLeave Id DragEvent
   | DropCard Id DragEvent
   | DealFromStock MouseEvent
 
+loadImages :: forall o m. MonadEffect m => H.HalogenM State Action () o m Unit
+loadImages = H.liftEffect $
+  foreachE
+    orderedDeck
+    ( \card -> do
+        img <- create
+        setSrc ("./assets/" <> cardImageUri card) img
+    )
+
 handleAction :: forall output m. MonadEffect m => Action → H.HalogenM State Action () output m Unit
 handleAction = case _ of
-  DragStart id _ -> do
-    H.liftEffect $ log $ "drag start " <> (show id)
+  LoadImages -> loadImages
+  DragStart id de -> do
+    -- FIXME(nathan): When cache is disabled drag image is not set properly.
+    --    Something to do with fetching the image first. This is ideally should
+    --    not be a problem when dragging for the first time because image is
+    --    already loaded as it has to be flipped before it can be dragged.
+    --    However explore different caching solutions such as loading all images
+    --    in advance or storing a reference to the image
+    -- draggedCard <- H.gets $ (map $ cardImageUri <<< _.card) <<< _.dragTarget
+    state <- H.get
+    let draggedCardUri = map (cardImageUri <<< _.card) $ getDragTarget id state
+    H.liftEffect do
+      log $ "drag start " <> (show id)
+      img <- create
+      -- TODO: the result of this is a maybe that indicates whether the operation
+      --    was successfull. Use it for something
+      _ <- sequence $ setSrc <$> (Just "./assets/" <> draggedCardUri) <*> Just img
+      setDragImage (dataTransfer de) (toElement img) 10 10
+
     H.modify_
       ( \st ->
-          st
-            { dragTarget = do
-                card <- case id of
-                  FoundationId i -> do
+          case id of
+            FoundationId i ->
+              st
+                { dragTarget = do
                     pile <- index st.foundations i
-                    head pile
-
-                  TableauId i -> do
+                    card <- head pile
+                    pure { card, id }
+                , foundations = fromMaybe [] do
+                    pile <- index st.foundations i
+                    _ <- tail pile
+                    pure []
+                }
+            TableauId i ->
+              st
+                { dragTarget = do
                     pile <- index st.tableau i
                     (Tuple card _) <- head pile
-                    pure card
-
-                  Waste -> head st.waste
-
-                pure { id, card }
-            }
+                    pure { card, id }
+                , tableau =
+                    mapWithIndex
+                      (\j x -> if i == j then fromMaybe [] $ tail x else x)
+                      st.tableau
+                }
+            Waste -> st
+              { dragTarget = do
+                  card <- head st.waste
+                  pure { card, id }
+              }
       )
 
   DragEnter _ e -> H.liftEffect do
     preventDefault $ toEvent e
     log "drag enter"
 
-  DragOver (TableauId i) e  -> do
+  DragOver (TableauId i) e -> do
     { dragTarget } <- H.get
     case dragTarget of
-      Just { id: (TableauId targetId), card } | targetId == i -> pure unit
-      _ -> H.liftEffect do
-        preventDefault $ toEvent e
-        logShow dragTarget
-        
-  DragOver (FoundationId i) e  -> do
-    { dragTarget } <- H.get
-    case dragTarget of
-      Just { id: (FoundationId targetId), card } | targetId == i -> pure unit
-      _ -> H.liftEffect do
-        preventDefault $ toEvent e
-        logShow dragTarget
+      Just { id: (TableauId targetId) } | targetId == i -> pure unit
+      _ -> H.liftEffect $ preventDefault $ toEvent e
 
+  DragOver (FoundationId i) e -> do
+    { dragTarget } <- H.get
+    case dragTarget of
+      Just { id: (FoundationId targetId) } | targetId == i -> pure unit
+      _ -> H.liftEffect do
+        preventDefault $ toEvent e
+
+  -- not a valid drop target
   DragOver Waste _ -> pure unit
-  -- DragOver (TableauId i) e -> H.liftEffect do
+
+  DragLeave _ _ -> H.liftEffect do
+    log "drag leave"
 
   DropCard i _ -> do
     H.liftEffect $ logShow i
@@ -232,6 +279,21 @@ handleAction = case _ of
       )
 
   NoOp -> pure unit
+
+getDragTarget :: Id -> State -> Maybe { card :: Card, cardId :: Id }
+getDragTarget cardId { foundations, tableau, waste } =
+  case cardId of
+    FoundationId i -> do
+      pile <- index foundations i
+      card <- head pile
+      pure { card, cardId }
+    TableauId i -> do
+      pile <- index tableau i
+      (Tuple card _) <- head pile
+      pure { card, cardId }
+    Waste -> do
+      card <- head waste
+      pure { card, cardId }
 
 ------------------------------------------------ RENDER -------------------------------------------------
 
@@ -273,9 +335,10 @@ renderStock _ =
 renderWaste :: forall cs m. Pile -> H.ComponentHTML Action cs m
 renderWaste wastePile =
   HH.div
-    [ HP.class_ $ HH.ClassName "slot waste" ]
-    [ fromMaybe emptySlot ((\topCard -> HH.img [ HP.src $ "./assets/" <> (cardImageUri $ topCard) ]) <$> (head wastePile))
+    [ HP.class_ $ HH.ClassName "slot waste"
+    , HE.onDragStart $ DragStart Waste
     ]
+    [ fromMaybe emptySlot ((\topCard -> HH.img [ HP.src $ "./assets/" <> (cardImageUri $ topCard) ]) <$> (head wastePile)) ]
 
 renderFoundations :: forall cs m. Array Pile -> H.ComponentHTML Action cs m
 renderFoundations fPiles =
@@ -286,6 +349,7 @@ renderFoundations fPiles =
             HH.div
               [ HE.onDragEnter $ DragEnter $ FoundationId i
               , HE.onDragOver $ DragOver $ FoundationId i
+              , HE.onDragLeave $ DragLeave $ FoundationId i
               , HE.onDrop $ DropCard $ FoundationId i
               ]
               [ fromMaybe emptySlot
@@ -311,6 +375,7 @@ renderPile :: forall cs m. Int -> Array (Tuple Card Boolean) -> H.ComponentHTML 
 renderPile i [] = HH.div
   [ HE.onDragEnter $ DragEnter $ TableauId i
   , HE.onDragOver $ DragOver $ TableauId i
+  , HE.onDragLeave $ DragLeave $ FoundationId i
   , HE.onDrop $ DropCard $ TableauId i
   ]
   [ emptySlot ]
@@ -318,6 +383,7 @@ renderPile i pile =
   HH.div
     [ HP.class_ $ HH.ClassName "tableau-pile"
     , HE.onDragEnter $ DragEnter $ TableauId i
+    , HE.onDragLeave $ DragLeave $ FoundationId i
     , HE.onDragOver $ DragOver $ TableauId i
     , HE.onDrop $ DropCard $ TableauId i
     ]
@@ -364,6 +430,9 @@ component =
   H.mkComponent
     { initialState
     , render
-    , eval: H.mkEval H.defaultEval { handleAction = handleAction }
+    , eval: H.mkEval H.defaultEval
+        { handleAction = handleAction
+        , initialize = Just LoadImages
+        }
     }
 

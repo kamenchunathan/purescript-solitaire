@@ -1,9 +1,12 @@
 { name = "halogen-project"
 , dependencies =
-  [ "arrays"
+  [ "aff"
+  , "arrays"
   , "console"
+  , "control"
   , "effect"
   , "foldable-traversable"
+  , "functions"
   , "halogen"
   , "integers"
   , "maybe"
