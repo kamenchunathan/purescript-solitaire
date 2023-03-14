@@ -86,7 +86,7 @@ type State =
   -- 4 stacks of cards, one for each suit in ascending order
   , foundations :: Array Pile
   -- Card currently being dragged and the id of the origin pile
-  , dragTarget :: Maybe { card :: Card, id :: Id }
+  , dragTarget :: Maybe { card :: Card, id :: CardId }
   }
 
 initialState :: forall input. input -> State
@@ -156,12 +156,12 @@ color (NormalCard c) =
 color (Joker cardColor) = cardColor
 
 ------------------------------------------------ UPDATE -------------------------------------------------
-data Id
+data CardId
   = FoundationId Int
   | TableauId Int
   | Waste
 
-instance showId :: Show Id where
+instance showId :: Show CardId where
   show (FoundationId id) = "foundation " <> (toStringAs decimal id)
   show (TableauId id) = "tableau " <> (toStringAs decimal id)
   show Waste = "waste"
@@ -169,11 +169,11 @@ instance showId :: Show Id where
 data Action
   = NoOp
   | LoadImages
-  | DragStart Id DragEvent
-  | DragEnter Id DragEvent
-  | DragOver Id DragEvent
-  | DragLeave Id DragEvent
-  | DropCard Id DragEvent
+  | DragStart CardId DragEvent
+  | DragEnter CardId DragEvent
+  | DragOver CardId DragEvent
+  | DragLeave CardId DragEvent
+  | DropCard CardId DragEvent
   | DealFromStock MouseEvent
 
 loadImages :: forall o m. MonadEffect m => H.HalogenM State Action () o m Unit
@@ -206,37 +206,37 @@ handleAction = case _ of
       _ <- sequence $ setSrc <$> (Just "./assets/" <> draggedCardUri) <*> Just img
       setDragImage (dataTransfer de) (toElement img) 10 10
 
-    H.modify_
-      ( \st ->
-          case id of
-            FoundationId i ->
-              st
-                { dragTarget = do
-                    pile <- index st.foundations i
-                    card <- head pile
-                    pure { card, id }
-                , foundations = fromMaybe [] do
-                    pile <- index st.foundations i
-                    _ <- tail pile
-                    pure []
-                }
-            TableauId i ->
-              st
-                { dragTarget = do
-                    pile <- index st.tableau i
-                    (Tuple card _) <- head pile
-                    pure { card, id }
-                , tableau =
-                    mapWithIndex
-                      (\j x -> if i == j then fromMaybe [] $ tail x else x)
-                      st.tableau
-                }
-            Waste -> st
-              { dragTarget = do
-                  card <- head st.waste
-                  pure { card, id }
-              }
-      )
+    -- H.modify_
+    --   ( \st ->
+    --       case id of
+    --         FoundationId i ->
+    --           st
+    --             { dragTarget = do
+    --                 pile <- index st.foundations i
+    --                 card <- head pile
+    --                 pure { card, id }
+    --             , foundations = fromMaybe [] do
+    --                 pile <- index st.foundations i
+    --                 _ <- tail pile
+    --                 pure []
+    --             }
+    --         TableauId i ->
+    --           st
+    --             { dragTarget = do
+    --                 pile <- index st.tableau i
+    --                 (Tuple card _) <- head pile
+    --                 pure { card, id }
+    --             , tableau =
+    --                 mapWithIndex
+    --                   (\j x -> if i == j then fromMaybe [] $ tail x else x)
+    --                   st.tableau
+    --             }
+    --         Waste -> st
+    --           { dragTarget = do
+    --               card <- head st.waste
+    --               pure { card, id }
+    --           }
+    --   )
 
   DragEnter _ e -> H.liftEffect do
     preventDefault $ toEvent e
@@ -280,7 +280,7 @@ handleAction = case _ of
 
   NoOp -> pure unit
 
-getDragTarget :: Id -> State -> Maybe { card :: Card, cardId :: Id }
+getDragTarget :: CardId -> State -> Maybe { card :: Card, cardId :: CardId }
 getDragTarget cardId { foundations, tableau, waste } =
   case cardId of
     FoundationId i -> do
