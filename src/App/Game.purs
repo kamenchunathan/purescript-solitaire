@@ -266,7 +266,7 @@ handleAction = case _ of
       ( \st ->
           case st.dragTarget of
             Just { cardId: TableauId i }
-              |  cardId == (TableauId i)  &&
+              | cardId == (TableauId i) &&
                   (map _.card st.dragTarget == bind (index st.tableau i) ((map fst) <<< head)) ->
                   st
                     { tableau =
@@ -274,9 +274,9 @@ handleAction = case _ of
                           (\j x -> if i == j then fromMaybe [] $ tail x else x)
                           st.tableau
                     }
-            Just { cardId: FoundationId i } -> 
-              st 
-            Just { cardId: Waste } -> 
+            Just { cardId: FoundationId i } ->
+              st
+            Just { cardId: Waste } ->
               st
             _ -> st
       )
