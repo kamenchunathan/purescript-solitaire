@@ -1,6 +1,15 @@
-# TODO:
+# Card Games Site
+A Site where you can play card games to be used for testing strategies and AI against humans.
+Written in purescript with the halogen framework. 
+
+The only game you can play currently is solitaire.
+
+## Solitaire
+First game I'm working on currently
+
+### Roadmap
 1. [x] Derive show for the types in the game 
-2. [] create functions for:
+2. [ ] create functions for:
     - [ ] creating a random deck / shuffling a deck  
     - [x] creating the 4 types of piles from a deck : stock, tableau, waste (initially empty), and foundations 
     - [x] converting a card to a path with the uri for the card asset 
@@ -12,6 +21,11 @@
    [ ]  some of the rendering  code is getting unweildy and may be difficult for me to understand in future. Heavily comment and split into smaller functions
 7. [ ] Actual functionality and responsiveness
     - [ ] Add ability to move cards from stock to wasee by clicking waste 
-    - [ ] drag and drop functionality - high priority 
     - [ ] rules for moving cards 
-8. [x] Add CI/CD and host application somewhere -very high priority 
+8. [ ] Drag and drop functionality - high priority 
+9. [x] Add CI/CD and host application somewhere -very high priority 
+
+### Notes on Implementation of the drag and drop feature
+The current method used to hide card being dragged by telling a pile to hide it's top card has some drawbacks.
+It 
+

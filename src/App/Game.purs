@@ -2,14 +2,16 @@ module App.Game where
 
 import Prelude
 
-import Data.Array (head, index, mapWithIndex, replicate, reverse, splitAt, tail, (..), (:))
+import Data.Array (head, index, length, mapWithIndex, replicate, reverse, splitAt, tail, (..), (:))
 import Data.Foldable (foldr)
 import Data.Int (decimal, toStringAs)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (toLower, joinWith)
 import Data.Traversable (sequence)
-import Data.Tuple (Tuple(..))
-import Effect (foreachE)
+import Data.Tuple (Tuple(..), fst)
+import Data.Tuple.Nested (tuple2)
+import Effect (Effect, foreachE)
+import Effect.Aff.Compat (EffectFn1, runEffectFn1)
 import Effect.Class (class MonadEffect)
 import Effect.Console (log, logShow)
 import Halogen as H
@@ -21,6 +23,11 @@ import Web.HTML.Event.DataTransfer (setDragImage)
 import Web.HTML.Event.DragEvent (DragEvent, dataTransfer, toEvent)
 import Web.HTML.HTMLImageElement (create, setSrc, toElement)
 import Web.UIEvent.MouseEvent (MouseEvent)
+
+foreign import _consoleLog :: forall a. EffectFn1 a Unit
+
+consoleLog :: forall a. a -> Effect Unit
+consoleLog = runEffectFn1 _consoleLog
 
 --------------------------------------------------------------------------------------------------------
 ------------------------------------------------ MODEL -------------------------------------------------
@@ -38,6 +45,13 @@ instance showSuit :: Show Suit where
   show Clubs = "Clubs"
   show Diamonds = "Diamonds"
 
+instance eqSuit :: Eq Suit where
+  eq Spades Spades = true
+  eq Hearts Hearts = true
+  eq Clubs Clubs = true
+  eq Diamonds Diamonds = true
+  eq _ _ = false
+
 data CardColour
   = Black
   | Red
@@ -45,6 +59,11 @@ data CardColour
 instance showCardColour :: Show CardColour where
   show Black = "Black"
   show Red = "Red"
+
+instance eqCardColour :: Eq CardColour where
+  eq Red Red = true
+  eq Black Black = true
+  eq _ _ = false
 
 data Value
   = Ace
@@ -60,6 +79,14 @@ instance showCardValue :: Show Value where
   show Queen = "Queen"
   show King = "King"
 
+instance eqCardValue :: Eq Value where
+  eq Ace Ace = true
+  eq (Num i) (Num j) = i == j
+  eq Jack Jack = true
+  eq Queen Queen = true
+  eq King King = true
+  eq _ _ = false
+
 type NormalCard =
   { value :: Value
   , suit :: Suit
@@ -73,6 +100,11 @@ instance showCard :: Show Card where
   show (NormalCard c) = show c
   show (Joker Red) = "Red joker"
   show (Joker Black) = "Black joker"
+
+instance eqCard :: Eq Card where
+  eq (Joker col1) (Joker col2) = col1 == col2
+  eq (NormalCard nc1) (NormalCard nc2) = nc1 == nc2
+  eq _ _ = false
 
 type Pile = Array Card
 
@@ -155,15 +187,22 @@ color (NormalCard c) =
 color (Joker cardColor) = cardColor
 
 ------------------------------------------------ UPDATE -------------------------------------------------
+-- TODO: Rename Not really cardid it is more a pileId
 data CardId
   = FoundationId Int
   | TableauId Int
   | Waste
 
-instance showId :: Show CardId where
+instance showCardId :: Show CardId where
   show (FoundationId id) = "foundation " <> (toStringAs decimal id)
   show (TableauId id) = "tableau " <> (toStringAs decimal id)
   show Waste = "waste"
+
+instance eqCardId :: Eq CardId where
+  eq (FoundationId i) (FoundationId j) = i == j
+  eq (TableauId i) (TableauId j) = i == j
+  eq (Waste) (Waste) = true
+  eq _ _ = false
 
 data Action
   = NoOp
@@ -188,13 +227,6 @@ handleAction :: forall output m. MonadEffect m => Action → H.HalogenM State Ac
 handleAction = case _ of
   LoadImages -> loadImages
   DragStart cardId de -> do
-    -- FIXME(nathan): When cache is disabled drag image is not set properly.
-    --    Something to do with fetching the image first. This is ideally should
-    --    not be a problem when dragging for the first time because image is
-    --    already loaded as it has to be flipped before it can be dragged.
-    --    However explore different caching solutions such as loading all images
-    --    in advance or storing a reference to the image
-    -- draggedCard <- H.gets $ (map $ cardImageUri <<< _.card) <<< _.dragTarget
     state <- H.get
     let draggedCardUri = map (cardImageUri <<< _.card) $ getDragTarget cardId state
     H.liftEffect do
@@ -205,41 +237,49 @@ handleAction = case _ of
       _ <- sequence $ setSrc <$> (Just "./assets/" <> draggedCardUri) <*> Just img
       setDragImage (dataTransfer de) (toElement img) 10 10
 
-    -- H.modify_
-    --   ( \st ->
-    --       case cardId of
-    --         FoundationId i ->
-    --           st
-    --             { dragTarget = do
-    --                 pile <- index st.foundations i
-    --                 card <- head pile
-    --                 pure { card, cardId }
-    --             , foundations = fromMaybe [] do
-    --                 pile <- index st.foundations i
-    --                 _ <- tail pile
-    --                 pure []
-    --             }
-    --         TableauId i ->
-    --           st
-    --             { dragTarget = do
-    --                 pile <- index st.tableau i
-    --                 (Tuple card _) <- head pile
-    --                 pure { card, cardId }
-    --             , tableau =
-    --                 mapWithIndex
-    --                   (\j x -> if i == j then fromMaybe [] $ tail x else x)
-    --                   st.tableau
-    --             }
-    --         Waste -> st
-    --           { dragTarget = do
-    --               card <- head st.waste
-    --               pure { card, cardId }
-    --           }
-    --   )
+    H.modify_
+      ( \st ->
+          case cardId of
+            FoundationId i ->
+              st
+                { dragTarget = do
+                    pile <- index st.foundations i
+                    card <- head pile
+                    pure { card, cardId }
+                }
+            TableauId i ->
+              st
+                { dragTarget = do
+                    pile <- index st.tableau i
+                    (Tuple card _) <- head pile
+                    pure { card, cardId }
+                }
+            Waste -> st
+              { dragTarget = do
+                  card <- head st.waste
+                  pure { card, cardId }
+              }
+      )
 
-  DragEnter _ e -> H.liftEffect do
-    preventDefault $ toEvent e
-    log "drag enter"
+  DragEnter cardId _ -> do
+    H.modify_
+      ( \st ->
+          case st.dragTarget of
+            Just { cardId: TableauId i }
+              |  cardId == (TableauId i)  &&
+                  (map _.card st.dragTarget == bind (index st.tableau i) ((map fst) <<< head)) ->
+                  st
+                    { tableau =
+                        mapWithIndex
+                          (\j x -> if i == j then fromMaybe [] $ tail x else x)
+                          st.tableau
+                    }
+            Just { cardId: FoundationId i } -> 
+              st 
+            Just { cardId: Waste } -> 
+              st
+            _ -> st
+      )
 
   DragOver (TableauId i) e -> do
     { dragTarget } <- H.get
@@ -260,8 +300,33 @@ handleAction = case _ of
   DragLeave _ _ -> H.liftEffect do
     log "drag leave"
 
-  DropCard i _ -> do
-    H.liftEffect $ logShow i
+  DropCard pileId _ -> do
+    H.modify_
+      ( \s ->
+          case Tuple pileId s.dragTarget of
+            Tuple (TableauId i) (Just { card }) ->
+              s
+                { tableau = mapWithIndex
+                    ( \j pile ->
+                        if i == j then
+                          (Tuple card true) : pile
+                        else pile
+                    )
+                    s.tableau
+                , dragTarget = Nothing
+                }
+            Tuple (FoundationId i) (Just { card }) -> s
+              { foundations = mapWithIndex
+                  ( \j pile ->
+                      if i == j then
+                        card : pile
+                      else pile
+                  )
+                  s.foundations
+              , dragTarget = Nothing
+              }
+            _ -> s
+      )
 
   DealFromStock _ -> do
     H.modify_
@@ -362,23 +427,31 @@ renderFoundations fPiles =
         fPiles
     )
 
-renderTableau :: forall cs m. Array (Array (Tuple Card Boolean)) -> H.ComponentHTML Action cs m
-renderTableau tPiles =
+renderTableau :: forall cs m. Array (Array (Tuple Card Boolean)) -> Maybe Int -> H.ComponentHTML Action cs m
+renderTableau tPiles dragId =
   HH.div
     [ HP.class_ $ HH.ClassName "slot tableau"
     , HP.style "align-items: start;"
     ]
-    (mapWithIndex renderPile tPiles)
+    ( mapWithIndex
+        ( \i ->
+            if (dragId == Just i) then
+              renderPile true i
+            else
+              renderPile false i
+        )
+        tPiles
+    )
 
-renderPile :: forall cs m. Int -> Array (Tuple Card Boolean) -> H.ComponentHTML Action cs m
-renderPile i [] = HH.div
+renderPile :: forall cs m. Boolean -> Int -> Array (Tuple Card Boolean) -> H.ComponentHTML Action cs m
+renderPile _ i [] = HH.div
   [ HE.onDragEnter $ DragEnter $ TableauId i
   , HE.onDragOver $ DragOver $ TableauId i
   , HE.onDragLeave $ DragLeave $ FoundationId i
   , HE.onDrop $ DropCard $ TableauId i
   ]
   [ emptySlot ]
-renderPile i pile =
+renderPile topCardHidden i pile =
   HH.div
     [ HP.class_ $ HH.ClassName "tableau-pile"
     , HE.onDragEnter $ DragEnter $ TableauId i
@@ -386,13 +459,19 @@ renderPile i pile =
     , HE.onDragOver $ DragOver $ TableauId i
     , HE.onDrop $ DropCard $ TableauId i
     ]
-    ( map
-        ( \(Tuple card flipped) ->
+    ( mapWithIndex
+        ( \j (Tuple card flipped) ->
             case flipped of
               true ->
                 HH.div
                   [ HP.draggable true
                   , HE.onDragStart $ DragStart $ TableauId i
+                  -- Hide the top card if it is being dragged
+                  , HP.style
+                      if j == (length pile - 1) && topCardHidden then
+                        "transition:0.01s; transform:translateX(-9999px)"
+                      else
+                        ""
                   ]
                   [ HH.img [ HP.src $ "./assets/" <> (cardImageUri card), HP.draggable false ] ]
               false -> HH.div
@@ -421,8 +500,11 @@ render state =
     , renderFoundations state.foundations
 
     -- Tableau
-    , renderTableau state.tableau
+    , renderTableau state.tableau (map (f <<< _.cardId) state.dragTarget)
     ]
+  where
+  f (TableauId i) = i
+  f _ = -1
 
 component :: forall query input output m. MonadEffect m => H.Component query input output m
 component =
