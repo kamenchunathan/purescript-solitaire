@@ -24,6 +24,9 @@ First game I'm working on currently
     - [ ] rules for moving cards 
 8. [ ] Drag and drop functionality - high priority 
 9. [x] Add CI/CD and host application somewhere -very high priority 
+10. [ ] SPA features
+    - [ ] Landing page
+    - [ ] Routing
 
 ### Notes on Implementation of the drag and drop feature
 The current method used to hide card being dragged by telling a pile to hide it's top card has some drawbacks.
