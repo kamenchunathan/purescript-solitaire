@@ -1,4 +1,4 @@
-module App.Game where
+module Pages.Solitaire (component, Action) where
 
 import Prelude
 
@@ -9,11 +9,9 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (toLower, joinWith)
 import Data.Traversable (sequence)
 import Data.Tuple (Tuple(..), fst)
-import Data.Tuple.Nested (tuple2)
-import Effect (Effect, foreachE)
-import Effect.Aff.Compat (EffectFn1, runEffectFn1)
+import Effect (foreachE)
 import Effect.Class (class MonadEffect)
-import Effect.Console (log, logShow)
+import Effect.Console (log)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -23,11 +21,6 @@ import Web.HTML.Event.DataTransfer (setDragImage)
 import Web.HTML.Event.DragEvent (DragEvent, dataTransfer, toEvent)
 import Web.HTML.HTMLImageElement (create, setSrc, toElement)
 import Web.UIEvent.MouseEvent (MouseEvent)
-
-foreign import _consoleLog :: forall a. EffectFn1 a Unit
-
-consoleLog :: forall a. a -> Effect Unit
-consoleLog = runEffectFn1 _consoleLog
 
 --------------------------------------------------------------------------------------------------------
 ------------------------------------------------ MODEL -------------------------------------------------
