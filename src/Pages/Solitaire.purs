@@ -3,6 +3,7 @@ module Pages.Solitaire (component, Action) where
 import Prelude
 
 import Data.Array (head, index, length, mapWithIndex, replicate, reverse, splitAt, tail, (..), (:))
+import Data.Card (Card(..), CardColour(..), Suit(..), Value(..))
 import Data.Foldable (foldr)
 import Data.Int (decimal, toStringAs)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -25,79 +26,6 @@ import Web.UIEvent.MouseEvent (MouseEvent)
 --------------------------------------------------------------------------------------------------------
 ------------------------------------------------ MODEL -------------------------------------------------
 --------------------------------------------------------------------------------------------------------
-
-data Suit
-  = Spades
-  | Hearts
-  | Clubs
-  | Diamonds
-
-instance showSuit :: Show Suit where
-  show Spades = "Spades"
-  show Hearts = "Hearts"
-  show Clubs = "Clubs"
-  show Diamonds = "Diamonds"
-
-instance eqSuit :: Eq Suit where
-  eq Spades Spades = true
-  eq Hearts Hearts = true
-  eq Clubs Clubs = true
-  eq Diamonds Diamonds = true
-  eq _ _ = false
-
-data CardColour
-  = Black
-  | Red
-
-instance showCardColour :: Show CardColour where
-  show Black = "Black"
-  show Red = "Red"
-
-instance eqCardColour :: Eq CardColour where
-  eq Red Red = true
-  eq Black Black = true
-  eq _ _ = false
-
-data Value
-  = Ace
-  | Num Int
-  | Jack
-  | Queen
-  | King
-
-instance showCardValue :: Show Value where
-  show Ace = "Ace"
-  show (Num i) = toStringAs decimal i
-  show Jack = "Jack"
-  show Queen = "Queen"
-  show King = "King"
-
-instance eqCardValue :: Eq Value where
-  eq Ace Ace = true
-  eq (Num i) (Num j) = i == j
-  eq Jack Jack = true
-  eq Queen Queen = true
-  eq King King = true
-  eq _ _ = false
-
-type NormalCard =
-  { value :: Value
-  , suit :: Suit
-  }
-
-data Card
-  = NormalCard NormalCard
-  | Joker CardColour
-
-instance showCard :: Show Card where
-  show (NormalCard c) = show c
-  show (Joker Red) = "Red joker"
-  show (Joker Black) = "Black joker"
-
-instance eqCard :: Eq Card where
-  eq (Joker col1) (Joker col2) = col1 == col2
-  eq (NormalCard nc1) (NormalCard nc2) = nc1 == nc2
-  eq _ _ = false
 
 type Pile = Array Card
 
@@ -170,14 +98,6 @@ splitDecktoTableauAndStock deck =
     )
     { after: deck, before: [] }
     (1 .. 7)
-
-color :: Card -> CardColour
-color (NormalCard c) =
-  case c.suit of
-    Spades -> Black
-    Clubs -> Black
-    _ -> Red
-color (Joker cardColor) = cardColor
 
 ------------------------------------------------ UPDATE -------------------------------------------------
 -- TODO: Rename Not really cardid it is more a pileId
@@ -267,7 +187,7 @@ handleAction = case _ of
                           (\j x -> if i == j then fromMaybe [] $ tail x else x)
                           st.tableau
                     }
-            Just { cardId: FoundationId i } ->
+            Just { cardId: FoundationId _ } ->
               st
             Just { cardId: Waste } ->
               st
