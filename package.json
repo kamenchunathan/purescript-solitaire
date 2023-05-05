@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "pnpm run build:purescript && vite",
-    "build": "pnpm run build:purescript && npm run build:tailwind && tsc && vite build",
+    "build": "pnpm run build:purescript && tsc && vite build",
     "build:purescript": "spago build",
     "spago": "spago",
     "clean": "rm -rf node_modules output dce-output .spago dist/* *.lock *.cache"
