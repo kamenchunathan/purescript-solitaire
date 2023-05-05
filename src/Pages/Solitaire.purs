@@ -356,7 +356,31 @@ renderTableau tPiles dragId =
         tPiles
     )
 
-renderPile :: forall cs m. Boolean -> Int -> Array (Tuple Card Boolean) -> H.ComponentHTML Action cs m
+renderCardImage
+  :: forall cs m r
+   . { card :: Card
+     , flipped :: Boolean
+     , hide :: Boolean
+     | r
+     }
+  -> H.ComponentHTML Action cs m
+renderCardImage { card, hide, flipped } =
+  HH.img
+    [ HP.src
+        if flipped then "./assets/" <> (cardImageUri card)
+        else "./assets/" <> backCardFace
+    , HP.draggable false
+    , HP.style
+        if hide then "transition:0.01s; transform:translateX(-9999px)"
+        else ""
+    ]
+
+renderPile
+  :: forall cs m
+   . Boolean
+  -> Int
+  -> Array (Tuple Card Boolean)
+  -> H.ComponentHTML Action cs m
 renderPile _ i [] = HH.div
   [ HE.onDragEnter $ DragEnter $ TableauId i
   , HE.onDragOver $ DragOver $ TableauId i
@@ -364,36 +388,33 @@ renderPile _ i [] = HH.div
   , HE.onDrop $ DropCard $ TableauId i
   ]
   [ emptySlot ]
-renderPile topCardHidden i pile =
+renderPile hideTopCard pileId pile =
   HH.div
     [ HP.class_ $ HH.ClassName "tableau-pile"
-    , HE.onDragEnter $ DragEnter $ TableauId i
-    , HE.onDragLeave $ DragLeave $ FoundationId i
-    , HE.onDragOver $ DragOver $ TableauId i
-    , HE.onDrop $ DropCard $ TableauId i
+    , HE.onDragEnter $ DragEnter $ TableauId pileId
+    , HE.onDragLeave $ DragLeave $ FoundationId pileId
+    , HE.onDragOver $ DragOver $ TableauId pileId
+    , HE.onDrop $ DropCard $ TableauId pileId
     ]
     ( mapWithIndex
-        ( \j (Tuple card flipped) ->
+        ( \i (Tuple card flipped) ->
             case flipped of
               true ->
                 HH.div
                   [ HP.draggable true
-                  , HE.onDragStart $ DragStart $ TableauId i
-                  -- Hide the top card if it is being dragged
-                  , HP.style
-                      if j == (length pile - 1) && topCardHidden then
-                        "transition:0.01s; transform:translateX(-9999px)"
-                      else
-                        ""
+                  , HE.onDragStart $ DragStart $ TableauId pileId
                   ]
-                  [ HH.img [ HP.src $ "./assets/" <> (cardImageUri card), HP.draggable false ] ]
+                  [ renderCardImage
+                      { card
+                      , flipped
+                      , hide: hideTopCard && i == (length pile - 1)
+                      }
+                  ]
               false -> HH.div
                 [ HP.draggable false
-                -- , HP.selectable false
-                , HE.onDragStart $ DragStart $ TableauId i
+                , HE.onDragStart $ DragStart $ TableauId pileId
                 ]
-                [ HH.img [ HP.draggable false, HP.src $ "./assets/" <> (backCardFace) ] ]
-
+                [ renderCardImage { card, flipped, hide: false } ]
         )
         (reverse pile)
     )
