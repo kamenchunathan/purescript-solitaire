@@ -9,10 +9,10 @@ import Data.Int (decimal, toStringAs)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (toLower, joinWith)
 import Data.Traversable (sequence)
-import Data.Tuple (Tuple(..), fst)
+import Data.Tuple (Tuple(..))
 import Effect (foreachE)
 import Effect.Class (class MonadEffect)
-import Effect.Console (log)
+import Effect.Class.Console (log)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -125,6 +125,7 @@ data Action
   | DragOver CardId DragEvent
   | DragLeave CardId DragEvent
   | DropCard CardId DragEvent
+  | DragEnd CardId DragEvent
   | DealFromStock MouseEvent
 
 loadImages :: forall o m. MonadEffect m => H.HalogenM State Action () o m Unit
@@ -136,21 +137,27 @@ loadImages = H.liftEffect $
         setSrc ("./assets/" <> cardImageUri card) img
     )
 
-handleAction :: forall output m. MonadEffect m => Action → H.HalogenM State Action () output m Unit
+handleAction
+  :: forall output m
+   . MonadEffect m
+  => Action
+  → H.HalogenM State Action () output m Unit
 handleAction = case _ of
   LoadImages -> loadImages
+
   DragStart cardId de -> do
     state <- H.get
     let draggedCardUri = map (cardImageUri <<< _.card) $ getDragTarget cardId state
+    -- Set the drag image 
     H.liftEffect do
-      log $ "drag start " <> (show cardId)
       img <- create
       -- TODO: the result of this is a maybe that indicates whether the operation
       --    was successfull. Use it for something
       _ <- sequence $ setSrc <$> (Just "./assets/" <> draggedCardUri) <*> Just img
       setDragImage (dataTransfer de) (toElement img) 10 10
 
-    H.modify_
+    -- Set the drag target into the state
+    { dragTarget } <- H.modify
       ( \st ->
           case cardId of
             FoundationId i ->
@@ -173,27 +180,17 @@ handleAction = case _ of
                   pure { card, cardId }
               }
       )
+    H.liftEffect $ log $ "Drag start: " <> (show dragTarget)
 
-  DragEnter cardId _ -> do
-    H.modify_
-      ( \st ->
-          case st.dragTarget of
-            Just { cardId: TableauId i }
-              | cardId == (TableauId i) &&
-                  (map _.card st.dragTarget == bind (index st.tableau i) ((map fst) <<< head)) ->
-                  st
-                    { tableau =
-                        mapWithIndex
-                          (\j x -> if i == j then fromMaybe [] $ tail x else x)
-                          st.tableau
-                    }
-            Just { cardId: FoundationId _ } ->
-              st
-            Just { cardId: Waste } ->
-              st
-            _ -> st
-      )
+  DragEnter id _ -> do
+    -- NOTE: might be a good place to add visual indications if it is a valid drop
+    -- target
+    log $ "Drag Enter: " <> (show id)
 
+  -- NOTE: preventing default on drag over identifies the event target as a
+  -- valid drop target.
+  -- This would be a wonderful place to add game logic that uses state to determine
+  -- if the card can be added to a specific pile
   DragOver (TableauId i) e -> do
     { dragTarget } <- H.get
     case dragTarget of
@@ -210,10 +207,13 @@ handleAction = case _ of
   -- not a valid drop target
   DragOver Waste _ -> pure unit
 
-  DragLeave _ _ -> H.liftEffect do
-    log "drag leave"
+  DragLeave id _ -> H.liftEffect do
+    log $ "Drag Leave: " <> (show id)
 
   DropCard pileId _ -> do
+    log $ "Drop card: " <> (show pileId)
+
+    -- Add the card that was being dragged to the current drop target pile
     H.modify_
       ( \s ->
           case Tuple pileId s.dragTarget of
@@ -226,7 +226,6 @@ handleAction = case _ of
                         else pile
                     )
                     s.tableau
-                , dragTarget = Nothing
                 }
             Tuple (FoundationId i) (Just { card }) -> s
               { foundations = mapWithIndex
@@ -236,10 +235,51 @@ handleAction = case _ of
                       else pile
                   )
                   s.foundations
-              , dragTarget = Nothing
               }
             _ -> s
       )
+
+    -- Remove the card being dragged from it's original pile. 
+    -- NOTE: This is where the card is removed. It was originally hidden
+    -- using style when the drag started but is still in it's pile in the
+    -- DOM
+    H.modify_
+      ( \(s@{ dragTarget }) ->
+          let
+            st = s { dragTarget = Nothing }
+          in
+            case dragTarget of
+              Just { cardId: (FoundationId originPileId) } ->
+                st
+                  { foundations = mapWithIndex
+                      ( \i p ->
+                          if i == originPileId then fromMaybe [] $ tail p
+                          else p
+                      )
+                      st.foundations
+                  }
+              Just { cardId: (TableauId originPileId) } ->
+                st
+                  { tableau = mapWithIndex
+                      ( \i p ->
+                          if i == originPileId then mapWithIndex
+                            ( \j (Tuple c flipped) ->
+                                if j == 0 then (Tuple c true)
+                                else (Tuple c flipped)
+                            )
+                            (fromMaybe [] $ tail p)
+                          else p
+                      )
+
+                      st.tableau
+                  }
+              Just { cardId: Waste } -> st { waste = fromMaybe [] $ tail st.waste }
+              _ -> st
+      )
+
+  DragEnd cardId _ -> do
+    log $ "Drag ended: " <> (show cardId)
+    H.modify_ (\st -> st { dragTarget = Nothing })
 
   DealFromStock _ -> do
     H.modify_
@@ -317,17 +357,23 @@ renderWaste wastePile =
     ]
     [ fromMaybe emptySlot ((\topCard -> HH.img [ HP.src $ "./assets/" <> (cardImageUri $ topCard) ]) <$> (head wastePile)) ]
 
-renderFoundations :: forall cs m. Array Pile -> H.ComponentHTML Action cs m
+renderFoundations
+  :: forall cs m
+   . Array Pile
+  -> H.ComponentHTML Action cs m
 renderFoundations fPiles =
   HH.div
     [ HP.class_ $ HH.ClassName "foundations slot" ]
     ( mapWithIndex
         ( \i pile ->
             HH.div
-              [ HE.onDragEnter $ DragEnter $ FoundationId i
+              [ HP.draggable true
+              , HE.onDragStart $ DragStart $ FoundationId i
+              , HE.onDragEnter $ DragEnter $ FoundationId i
               , HE.onDragOver $ DragOver $ FoundationId i
               , HE.onDragLeave $ DragLeave $ FoundationId i
               , HE.onDrop $ DropCard $ FoundationId i
+              , HE.onDragEnd $ DragEnd $ FoundationId i
               ]
               [ fromMaybe emptySlot
                   $ map
@@ -340,19 +386,18 @@ renderFoundations fPiles =
         fPiles
     )
 
-renderTableau :: forall cs m. Array (Array (Tuple Card Boolean)) -> Maybe Int -> H.ComponentHTML Action cs m
+renderTableau
+  :: forall cs m
+   . Array (Array (Tuple Card Boolean))
+  -> Maybe Int
+  -> H.ComponentHTML Action cs m
 renderTableau tPiles dragId =
   HH.div
     [ HP.class_ $ HH.ClassName "slot tableau"
     , HP.style "align-items: start;"
     ]
     ( mapWithIndex
-        ( \i ->
-            if (dragId == Just i) then
-              renderPile true i
-            else
-              renderPile false i
-        )
+        (\i -> renderPile (dragId == Just i) i)
         tPiles
     )
 
@@ -375,26 +420,30 @@ renderCardImage { card, hide, flipped } =
         else ""
     ]
 
+-- TODO: if the pile is empty and the top card is to be hidden display the widget
+-- for an empty pile
 renderPile
   :: forall cs m
    . Boolean
   -> Int
   -> Array (Tuple Card Boolean)
   -> H.ComponentHTML Action cs m
-renderPile _ i [] = HH.div
-  [ HE.onDragEnter $ DragEnter $ TableauId i
-  , HE.onDragOver $ DragOver $ TableauId i
-  , HE.onDragLeave $ DragLeave $ FoundationId i
-  , HE.onDrop $ DropCard $ TableauId i
+renderPile _ pileId [] = HH.div
+  [ HE.onDragEnter $ DragEnter $ TableauId pileId
+  , HE.onDragOver $ DragOver $ TableauId pileId
+  , HE.onDragLeave $ DragLeave $ TableauId pileId
+  , HE.onDrop $ DropCard $ TableauId pileId
+  , HE.onDragEnd $ DragEnd $ TableauId pileId
   ]
   [ emptySlot ]
 renderPile hideTopCard pileId pile =
   HH.div
     [ HP.class_ $ HH.ClassName "tableau-pile"
     , HE.onDragEnter $ DragEnter $ TableauId pileId
-    , HE.onDragLeave $ DragLeave $ FoundationId pileId
+    , HE.onDragLeave $ DragLeave $ TableauId pileId
     , HE.onDragOver $ DragOver $ TableauId pileId
     , HE.onDrop $ DropCard $ TableauId pileId
+    , HE.onDragEnd $ DragEnd $ TableauId pileId
     ]
     ( mapWithIndex
         ( \i (Tuple card flipped) ->
