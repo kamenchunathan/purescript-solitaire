@@ -10,6 +10,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Navigate (class Navigate, navigate)
 import Pages.Solitaire as SolitairePage
+import Pages.Home as HomePage
 import Routing.PushState (PushStateInterface)
 import Type.Prelude (Proxy(..))
 
@@ -25,9 +26,12 @@ data Query a
 data Action
   = Initialize
   | HandleSolitairePageAction SolitairePage.Action
+  | HandleHomePageAction HomePage.Action
 
 type ChildSlots =
-  (solitairePage :: forall query. H.Slot query SolitairePage.Action Unit)
+  ( solitairePage :: forall query. H.Slot query SolitairePage.Action Unit
+  , homePage :: forall query. H.Slot query HomePage.Action Unit
+  )
 
 initialState :: PushStateInterface -> State
 initialState nav =
@@ -61,7 +65,7 @@ handleQuery = case _ of
 
 render :: forall m. MonadEffect m => State -> H.ComponentHTML Action ChildSlots m
 render st = case fromMaybe NotFound st.current_route of
-  Home -> HH.div [] [ HH.text "Home Page" ]
+  Home -> HH.slot (Proxy :: _ "homePage") unit HomePage.component unit HandleHomePageAction
   Solitaire -> HH.slot (Proxy :: _ "solitairePage") unit SolitairePage.component unit HandleSolitairePageAction
   NotFound -> HH.div [] [ HH.text "Page Not Found" ]
 
