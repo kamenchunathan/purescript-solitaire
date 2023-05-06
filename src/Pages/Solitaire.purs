@@ -2,6 +2,7 @@ module Pages.Solitaire (component, Action) where
 
 import Prelude
 
+import Component.Navbar (navbar)
 import Data.Array (head, index, length, mapWithIndex, replicate, reverse, splitAt, tail, (..), (:))
 import Data.Card (Card(..), CardColour(..), Suit(..), Value(..))
 import Data.Foldable (foldr)
@@ -327,19 +328,19 @@ backCardFace = "back_blue_basic.png"
 
 emptySlot :: forall cs m. H.ComponentHTML Action cs m
 emptySlot =
-  HH.div [ HP.class_ $ HH.ClassName "empty-slot" ] []
+  HH.div [ HP.class_ $ HH.ClassName "bg-tuscany h-[84px] w-[60px]" ] []
 
 renderStock :: forall cs m. Pile -> H.ComponentHTML Action cs m
 renderStock [] =
   HH.div
-    [ HP.class_ $ HH.ClassName "slot stock"
+    [ HP.class_ $ HH.ClassName ""
     , HE.onClick DealFromStock
     ]
     [ emptySlot ]
 
 renderStock _ =
   HH.div
-    [ HP.class_ $ HH.ClassName "slot stock"
+    [ HP.class_ $ HH.ClassName ""
     , HP.draggable false
     , HE.onClick DealFromStock
     ]
@@ -352,7 +353,7 @@ renderStock _ =
 renderWaste :: forall cs m. Pile -> H.ComponentHTML Action cs m
 renderWaste wastePile =
   HH.div
-    [ HP.class_ $ HH.ClassName "slot waste"
+    [ HP.class_ $ HH.ClassName "col-start-2 "
     , HE.onDragStart $ DragStart Waste
     ]
     [ fromMaybe emptySlot ((\topCard -> HH.img [ HP.src $ "./assets/" <> (cardImageUri $ topCard) ]) <$> (head wastePile)) ]
@@ -363,7 +364,7 @@ renderFoundations
   -> H.ComponentHTML Action cs m
 renderFoundations fPiles =
   HH.div
-    [ HP.class_ $ HH.ClassName "foundations slot" ]
+    [ HP.class_ $ HH.ClassName "col-start-3 flex gap-4 " ]
     ( mapWithIndex
         ( \i pile ->
             HH.div
@@ -393,8 +394,8 @@ renderTableau
   -> H.ComponentHTML Action cs m
 renderTableau tPiles dragId =
   HH.div
-    [ HP.class_ $ HH.ClassName "slot tableau"
-    , HP.style "align-items: start;"
+    [ HP.class_ $ HH.ClassName $
+        "row-start-2 col-start-1 row-end-5 col-end-4 flex justify-between"
     ]
     ( mapWithIndex
         (\i -> renderPile (dragId == Just i) i)
@@ -471,19 +472,26 @@ renderPile hideTopCard pileId pile =
 render :: forall cs m. State -> H.ComponentHTML Action cs m
 render state =
   HH.div
-    [ HP.class_ $ HH.ClassName "container" ]
-    [
-      -- Stock 
-      renderStock state.stock
+    [ HP.class_ $ HH.ClassName $
+        "bg-xanadu min-h-screen overflow-hidden pb-8"
+    ]
+    [ navbar [ "Solitaire" ]
+    , HH.div
+        [ HP.class_ $ HH.ClassName $
+            "h-full grid grid-cols-3 grid-rows-4 w-5/6 lg:w-3/6 mx-auto"
+        ]
+        [ -- Stock 
+          renderStock state.stock
 
-    -- waste 
-    , renderWaste state.waste
+        -- waste 
+        , renderWaste state.waste
 
-    -- Foundations
-    , renderFoundations state.foundations
+        -- Foundations
+        , renderFoundations state.foundations
 
-    -- Tableau
-    , renderTableau state.tableau (map (f <<< _.cardId) state.dragTarget)
+        -- Tableau
+        , renderTableau state.tableau (map (f <<< _.cardId) state.dragTarget)
+        ]
     ]
   where
   f (TableauId i) = i

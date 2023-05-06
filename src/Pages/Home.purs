@@ -2,6 +2,7 @@ module Pages.Home (component, Action) where
 
 import Prelude
 
+import Component.Navbar (navbar)
 import Halogen (ClassName(..))
 import Halogen as H
 import Halogen.HTML as HH
@@ -18,20 +19,7 @@ render :: forall cs m. State -> H.ComponentHTML Action cs m
 render _ =
   HH.div
     [ HP.class_ $ ClassName "bg-xanadu min-h-screen" ]
-    [ -- header
-      HH.div
-        [ HP.class_ $ ClassName $ "w-5/6 py-4 mx-auto text-emerald-50 "
-            <> "font-semibold text-3xl flex justify-between items-end"
-        ]
-        [ HH.a
-            [ HP.href "/" ]
-            [ HH.text "A-Team ♠" ]
-        , HH.a
-            [ HP.class_ $ ClassName "text-2xl"
-            , HP.href "/"
-            ]
-            [ HH.text "Get Started" ]
-        ]
+    [ navbar []
     -- Main banner
     , HH.div
         [ HP.class_ $ ClassName "flex items-center justify-evenly mt-24" ]
