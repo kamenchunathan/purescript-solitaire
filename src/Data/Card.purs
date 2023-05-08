@@ -88,6 +88,10 @@ instance Eq a => Eq (Card a) where
   eq (NormalCard nc1 a1) (NormalCard nc2 a2) = nc1 == nc2 && a1 == a2
   eq _ _ = false
 
+instance Functor Card where
+  map f (NormalCard info a) = NormalCard info (f a)
+  map f (Joker info a) = Joker info (f a)
+
 color :: forall a. (Card a) -> CardColour
 color (NormalCard c _) =
   case c.suit of
