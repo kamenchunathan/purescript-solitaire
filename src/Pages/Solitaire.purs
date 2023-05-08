@@ -28,24 +28,37 @@ import Web.UIEvent.MouseEvent (MouseEvent)
 ------------------------------------------------ MODEL -------------------------------------------------
 --------------------------------------------------------------------------------------------------------
 
-type Pile = Array Card
+type Pile a = Array (Card a)
+
+type TableauInfo = { flipped :: Boolean }
 
 type State =
-  { stock :: Pile
+  {
+    -- A stack of cards all face down that can be moved to the waste a number
+    -- of times
+    stock :: Pile Unit
+
   -- 7 Piles with only the top card face up. Boolean shows if the card is flipped
-  , tableau :: Array (Array (Tuple Card Boolean))
+  , tableau :: Array (Pile TableauInfo)
+
   -- a pile where cards are dealt from the stock 
-  , waste :: Pile
+  , waste :: Pile Unit
+
   -- 4 stacks of cards, one for each suit in ascending order
-  , foundations :: Array Pile
+  , foundations :: Array (Pile Unit)
+
   -- Card currently being dragged and the id of the origin pile
-  , dragTarget :: Maybe { card :: Card, cardId :: CardId }
+  , dragTarget ::
+      Maybe
+        { card :: Card Unit
+        , cardId :: CardId
+        }
   }
 
 initialState :: forall input. input -> State
 initialState _ =
   { stock
-  , tableau: map flippedTopCard tableau
+  , tableau: map withFlippedTopCard (map (\a -> map withDefaultTableauInfo a) tableau)
   , waste: []
   , foundations: replicate 4 []
   , dragTarget: Nothing
@@ -53,39 +66,35 @@ initialState _ =
   where
   { tableau, stock } = splitDecktoTableauAndStock orderedDeck
 
-flippedTopCard :: Pile -> Array (Tuple Card Boolean)
-flippedTopCard [] = []
-flippedTopCard cards =
-  append
-    (fromMaybe [] $ map (\topCard -> [ Tuple topCard true ]) (head $ reverse cards))
-    (fromMaybe [] $ map (\rest -> map (\card -> Tuple card false) rest) (tail $ reverse cards))
-
-orderedDeck :: Pile
+orderedDeck :: Pile Unit
 orderedDeck =
-  [ Joker Black, Joker Red ]
+  [ Joker Black unit, Joker Red unit ]
     <> singleSuit Spades
     <> singleSuit Diamonds
     <> (reverse $ singleSuit Clubs)
     <> (reverse $ singleSuit Hearts)
 
-singleSuit :: Suit -> Pile
+singleSuit :: Suit -> Pile Unit
 singleSuit suit =
-  [ NormalCard { value: Ace, suit: suit }
-  , NormalCard { value: Num 2, suit: suit }
-  , NormalCard { value: Num 3, suit: suit }
-  , NormalCard { value: Num 4, suit: suit }
-  , NormalCard { value: Num 5, suit: suit }
-  , NormalCard { value: Num 6, suit: suit }
-  , NormalCard { value: Num 7, suit: suit }
-  , NormalCard { value: Num 8, suit: suit }
-  , NormalCard { value: Num 9, suit: suit }
-  , NormalCard { value: Num 10, suit: suit }
-  , NormalCard { value: Jack, suit: suit }
-  , NormalCard { value: Queen, suit: suit }
-  , NormalCard { value: King, suit: suit }
+  [ NormalCard { value: Ace, suit: suit } unit
+  , NormalCard { value: Num 2, suit: suit } unit
+  , NormalCard { value: Num 3, suit: suit } unit
+  , NormalCard { value: Num 4, suit: suit } unit
+  , NormalCard { value: Num 5, suit: suit } unit
+  , NormalCard { value: Num 6, suit: suit } unit
+  , NormalCard { value: Num 7, suit: suit } unit
+  , NormalCard { value: Num 8, suit: suit } unit
+  , NormalCard { value: Num 9, suit: suit } unit
+  , NormalCard { value: Num 10, suit: suit } unit
+  , NormalCard { value: Jack, suit: suit } unit
+  , NormalCard { value: Queen, suit: suit } unit
+  , NormalCard { value: King, suit: suit } unit
   ]
 
-splitDecktoTableauAndStock :: Pile -> { tableau :: Array Pile, stock :: Pile }
+splitDecktoTableauAndStock
+  :: forall a
+   . (Pile a)
+  -> { tableau :: Array (Pile a), stock :: (Pile a) }
 splitDecktoTableauAndStock deck =
   { tableau: res.before
   , stock: res.after
@@ -99,6 +108,52 @@ splitDecktoTableauAndStock deck =
     )
     { after: deck, before: [] }
     (1 .. 7)
+
+discardInfo :: forall a. Card a -> Card Unit
+discardInfo card =
+  case card of
+    NormalCard a _ -> NormalCard a unit
+    Joker a _ -> Joker a unit
+
+withDefaultTableauInfo :: forall a. Card a -> Card TableauInfo
+withDefaultTableauInfo = case _ of
+  NormalCard a _ -> NormalCard a { flipped: false }
+  Joker a _ -> Joker a { flipped: false }
+
+withFlippedTopCard
+  :: Pile TableauInfo
+  -> Pile TableauInfo
+withFlippedTopCard [] = []
+withFlippedTopCard cards =
+  let
+    faceup (NormalCard a _) = [ NormalCard a { flipped: true } ]
+    faceup (Joker col _) = [ Joker col { flipped: true } ]
+
+    facedown = map
+      ( \card ->
+          case card of
+            NormalCard a _ -> NormalCard a { flipped: false }
+            Joker col _ -> Joker col { flipped: false }
+      )
+
+  in
+    append
+      (fromMaybe [] $ map faceup (head $ reverse cards))
+      (fromMaybe [] $ map facedown (tail $ reverse cards))
+
+setFlipped
+  :: Boolean
+  -> Card { flipped :: Boolean | _ }
+  -> Card { flipped :: Boolean | _ }
+setFlipped flipped card =
+  case card of
+    Joker a r -> Joker a (r { flipped = flipped })
+    NormalCard a r -> NormalCard a (r { flipped = flipped })
+
+getFlipped :: Card { flipped :: Boolean | _ } -> Boolean
+getFlipped = case _ of
+  Joker _ { flipped } -> flipped
+  NormalCard _ { flipped } -> flipped
 
 ------------------------------------------------ UPDATE -------------------------------------------------
 -- TODO: Rename Not really cardid it is more a pileId
@@ -172,7 +227,7 @@ handleAction = case _ of
               st
                 { dragTarget = do
                     pile <- index st.tableau i
-                    (Tuple card _) <- head pile
+                    card <- discardInfo <$> head pile
                     pure { card, cardId }
                 }
             Waste -> st
@@ -223,7 +278,7 @@ handleAction = case _ of
                 { tableau = mapWithIndex
                     ( \j pile ->
                         if i == j then
-                          (Tuple card true) : pile
+                          (setFlipped true $ withDefaultTableauInfo card) : pile
                         else pile
                     )
                     s.tableau
@@ -264,9 +319,9 @@ handleAction = case _ of
                   { tableau = mapWithIndex
                       ( \i p ->
                           if i == originPileId then mapWithIndex
-                            ( \j (Tuple c flipped) ->
-                                if j == 0 then (Tuple c true)
-                                else (Tuple c flipped)
+                            ( \j card ->
+                                if j == 0 then (setFlipped true card)
+                                else card
                             )
                             (fromMaybe [] $ tail p)
                           else p
@@ -298,7 +353,13 @@ handleAction = case _ of
 
   NoOp -> pure unit
 
-getDragTarget :: CardId -> State -> Maybe { card :: Card, cardId :: CardId }
+getDragTarget
+  :: CardId
+  -> State
+  -> Maybe
+       { card :: (Card Unit)
+       , cardId :: CardId
+       }
 getDragTarget cardId { foundations, tableau, waste } =
   case cardId of
     FoundationId i -> do
@@ -307,7 +368,7 @@ getDragTarget cardId { foundations, tableau, waste } =
       pure { card, cardId }
     TableauId i -> do
       pile <- index tableau i
-      (Tuple card _) <- head pile
+      card <- head $ discardInfo <$> pile
       pure { card, cardId }
     Waste -> do
       card <- head waste
@@ -315,10 +376,10 @@ getDragTarget cardId { foundations, tableau, waste } =
 
 ------------------------------------------------ RENDER -------------------------------------------------
 
-cardImageUri :: Card -> String
-cardImageUri (NormalCard c) =
+cardImageUri :: forall a. Card a -> String
+cardImageUri (NormalCard c _) =
   (toLower $ joinWith "_" [ show c.value, show c.suit, "white" ]) <> ".png"
-cardImageUri (Joker _) =
+cardImageUri (Joker _ _) =
   "joker_white.png"
 
 -- ( toLower $ joinWith "_" ["joker", show col ]) <> ".png"
@@ -330,7 +391,10 @@ emptySlot :: forall cs m. H.ComponentHTML Action cs m
 emptySlot =
   HH.div [ HP.class_ $ HH.ClassName "bg-tuscany h-[84px] w-[60px]" ] []
 
-renderStock :: forall cs m. Pile -> H.ComponentHTML Action cs m
+renderStock
+  :: forall cs m
+   . Pile Unit
+  -> H.ComponentHTML Action cs m
 renderStock [] =
   HH.div
     [ HP.class_ $ HH.ClassName ""
@@ -350,7 +414,7 @@ renderStock _ =
         ]
     ]
 
-renderWaste :: forall cs m. Pile -> H.ComponentHTML Action cs m
+renderWaste :: forall cs m. Pile Unit -> H.ComponentHTML Action cs m
 renderWaste wastePile =
   HH.div
     [ HP.class_ $ HH.ClassName "col-start-2 "
@@ -360,7 +424,7 @@ renderWaste wastePile =
 
 renderFoundations
   :: forall cs m
-   . Array Pile
+   . Array (Pile Unit)
   -> H.ComponentHTML Action cs m
 renderFoundations fPiles =
   HH.div
@@ -389,7 +453,7 @@ renderFoundations fPiles =
 
 renderTableau
   :: forall cs m
-   . Array (Array (Tuple Card Boolean))
+   . Array (Pile TableauInfo)
   -> Maybe Int
   -> H.ComponentHTML Action cs m
 renderTableau tPiles dragId =
@@ -398,13 +462,13 @@ renderTableau tPiles dragId =
         "row-start-2 col-start-1 row-end-5 col-end-4 flex justify-between"
     ]
     ( mapWithIndex
-        (\i -> renderPile (dragId == Just i) i)
+        (\i -> renderTableauPile (dragId == Just i) i)
         tPiles
     )
 
 renderCardImage
-  :: forall cs m r
-   . { card :: Card
+  :: forall a cs m r
+   . { card :: Card a
      , flipped :: Boolean
      , hide :: Boolean
      | r
@@ -423,13 +487,13 @@ renderCardImage { card, hide, flipped } =
 
 -- TODO: if the pile is empty and the top card is to be hidden display the widget
 -- for an empty pile
-renderPile
+renderTableauPile
   :: forall cs m
    . Boolean
   -> Int
-  -> Array (Tuple Card Boolean)
+  -> Pile TableauInfo
   -> H.ComponentHTML Action cs m
-renderPile _ pileId [] = HH.div
+renderTableauPile _ pileId [] = HH.div
   [ HE.onDragEnter $ DragEnter $ TableauId pileId
   , HE.onDragOver $ DragOver $ TableauId pileId
   , HE.onDragLeave $ DragLeave $ TableauId pileId
@@ -437,7 +501,7 @@ renderPile _ pileId [] = HH.div
   , HE.onDragEnd $ DragEnd $ TableauId pileId
   ]
   [ emptySlot ]
-renderPile hideTopCard pileId pile =
+renderTableauPile hideTopCard pileId pile =
   HH.div
     [ HP.class_ $ HH.ClassName "tableau-pile"
     , HE.onDragEnter $ DragEnter $ TableauId pileId
@@ -447,24 +511,29 @@ renderPile hideTopCard pileId pile =
     , HE.onDragEnd $ DragEnd $ TableauId pileId
     ]
     ( mapWithIndex
-        ( \i (Tuple card flipped) ->
-            case flipped of
-              true ->
-                HH.div
-                  [ HP.draggable true
-                  , HE.onDragStart $ DragStart $ TableauId pileId
-                  ]
-                  [ renderCardImage
-                      { card
-                      , flipped
-                      , hide: hideTopCard && i == (length pile - 1)
-                      }
-                  ]
-              false -> HH.div
+        ( \i card ->
+            if getFlipped card then
+              HH.div
+                [ HP.draggable true
+                , HE.onDragStart $ DragStart $ TableauId pileId
+                ]
+                [ renderCardImage
+                    { card
+                    , flipped: getFlipped card
+                    , hide: hideTopCard && i == (length pile - 1)
+                    }
+                ]
+            else
+              HH.div
                 [ HP.draggable false
                 , HE.onDragStart $ DragStart $ TableauId pileId
                 ]
-                [ renderCardImage { card, flipped, hide: false } ]
+                [ renderCardImage
+                    { card
+                    , flipped: getFlipped card
+                    , hide: false
+                    }
+                ]
         )
         (reverse pile)
     )

@@ -70,26 +70,29 @@ type NormalCard =
   , suit :: Suit
   }
 
-data Card
-  = NormalCard NormalCard
-  | Joker CardColour
+-- The higher kind allows additional information to be stored to the card type that
+-- is relevant to the card but not core to the type
+-- for example if a card is facing up or down
+--/ Card { flipped :: False }
+data Card a
+  = NormalCard NormalCard a
+  | Joker CardColour a
 
-instance showCard :: Show Card where
-  show (NormalCard c) = show c
-  show (Joker Red) = "Red joker"
-  show (Joker Black) = "Black joker"
+instance Show a => Show (Card a) where
+  show (NormalCard c _) = show c
+  show (Joker Red _) = "Red joker"
+  show (Joker Black _) = "Black joker"
 
-instance eqCard :: Eq Card where
-  eq (Joker col1) (Joker col2) = col1 == col2
-  eq (NormalCard nc1) (NormalCard nc2) = nc1 == nc2
+instance Eq a => Eq (Card a) where
+  eq (Joker col1 a1) (Joker col2 a2) = col1 == col2 && a1 == a2
+  eq (NormalCard nc1 a1) (NormalCard nc2 a2) = nc1 == nc2 && a1 == a2
   eq _ _ = false
 
-color :: Card -> CardColour
-color (NormalCard c) =
+color :: forall a. (Card a) -> CardColour
+color (NormalCard c _) =
   case c.suit of
     Spades -> Black
     Clubs -> Black
     _ -> Red
-color (Joker cardColor) = cardColor
-
+color (Joker cardColor _) = cardColor
 
