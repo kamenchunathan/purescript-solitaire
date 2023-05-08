@@ -51,7 +51,7 @@ type State =
   , dragTarget ::
       Maybe
         { card :: Card Unit
-        , cardId :: CardId
+        , pileId :: PileId
         }
   }
 
@@ -141,33 +141,24 @@ withFlippedTopCard cards =
       (fromMaybe [] $ map faceup (head $ reverse cards))
       (fromMaybe [] $ map facedown (tail $ reverse cards))
 
-setFlipped
-  :: Boolean
-  -> Card { flipped :: Boolean | _ }
-  -> Card { flipped :: Boolean | _ }
-setFlipped flipped card =
-  case card of
-    Joker a r -> Joker a (r { flipped = flipped })
-    NormalCard a r -> NormalCard a (r { flipped = flipped })
-
-getFlipped :: Card { flipped :: Boolean | _ } -> Boolean
+getFlipped :: forall r. Card { flipped :: Boolean | r } -> Boolean
 getFlipped = case _ of
   Joker _ { flipped } -> flipped
   NormalCard _ { flipped } -> flipped
 
 ------------------------------------------------ UPDATE -------------------------------------------------
 -- TODO: Rename Not really cardid it is more a pileId
-data CardId
+data PileId
   = FoundationId Int
   | TableauId Int
   | Waste
 
-instance showCardId :: Show CardId where
+instance showPileId :: Show PileId where
   show (FoundationId id) = "foundation " <> (toStringAs decimal id)
   show (TableauId id) = "tableau " <> (toStringAs decimal id)
   show Waste = "waste"
 
-instance eqCardId :: Eq CardId where
+instance eqPileId :: Eq PileId where
   eq (FoundationId i) (FoundationId j) = i == j
   eq (TableauId i) (TableauId j) = i == j
   eq (Waste) (Waste) = true
@@ -176,12 +167,12 @@ instance eqCardId :: Eq CardId where
 data Action
   = NoOp
   | LoadImages
-  | DragStart CardId DragEvent
-  | DragEnter CardId DragEvent
-  | DragOver CardId DragEvent
-  | DragLeave CardId DragEvent
-  | DropCard CardId DragEvent
-  | DragEnd CardId DragEvent
+  | DragStart PileId DragEvent
+  | DragEnter PileId DragEvent
+  | DragOver PileId DragEvent
+  | DragLeave PileId DragEvent
+  | DropCard PileId DragEvent
+  | DragEnd PileId DragEvent
   | DealFromStock MouseEvent
 
 loadImages :: forall o m. MonadEffect m => H.HalogenM State Action () o m Unit
@@ -201,9 +192,9 @@ handleAction
 handleAction = case _ of
   LoadImages -> loadImages
 
-  DragStart cardId de -> do
+  DragStart pileId de -> do
     state <- H.get
-    let draggedCardUri = map (cardImageUri <<< _.card) $ getDragTarget cardId state
+    let draggedCardUri = map (cardImageUri <<< _.card) $ getDragTarget pileId state
     -- Set the drag image 
     H.liftEffect do
       img <- create
@@ -215,25 +206,25 @@ handleAction = case _ of
     -- Set the drag target into the state
     { dragTarget } <- H.modify
       ( \st ->
-          case cardId of
+          case pileId of
             FoundationId i ->
               st
                 { dragTarget = do
                     pile <- index st.foundations i
                     card <- head pile
-                    pure { card, cardId }
+                    pure { card, pileId }
                 }
             TableauId i ->
               st
                 { dragTarget = do
                     pile <- index st.tableau i
                     card <- discardInfo <$> head pile
-                    pure { card, cardId }
+                    pure { card, pileId }
                 }
             Waste -> st
               { dragTarget = do
                   card <- head st.waste
-                  pure { card, cardId }
+                  pure { card, pileId }
               }
       )
     H.liftEffect $ log $ "Drag start: " <> (show dragTarget)
@@ -250,13 +241,13 @@ handleAction = case _ of
   DragOver (TableauId i) e -> do
     { dragTarget } <- H.get
     case dragTarget of
-      Just { cardId: (TableauId targetId) } | targetId == i -> pure unit
+      Just { pileId: (TableauId targetId) } | targetId == i -> pure unit
       _ -> H.liftEffect $ preventDefault $ toEvent e
 
   DragOver (FoundationId i) e -> do
     { dragTarget } <- H.get
     case dragTarget of
-      Just { cardId: (FoundationId targetId) } | targetId == i -> pure unit
+      Just { pileId: (FoundationId targetId) } | targetId == i -> pure unit
       _ -> H.liftEffect do
         preventDefault $ toEvent e
 
@@ -278,7 +269,7 @@ handleAction = case _ of
                 { tableau = mapWithIndex
                     ( \j pile ->
                         if i == j then
-                          (setFlipped true $ withDefaultTableauInfo card) : pile
+                          ((\r -> r { flipped = true }) <$> withDefaultTableauInfo card) : pile
                         else pile
                     )
                     s.tableau
@@ -305,7 +296,7 @@ handleAction = case _ of
             st = s { dragTarget = Nothing }
           in
             case dragTarget of
-              Just { cardId: (FoundationId originPileId) } ->
+              Just { pileId: (FoundationId originPileId) } ->
                 st
                   { foundations = mapWithIndex
                       ( \i p ->
@@ -314,14 +305,16 @@ handleAction = case _ of
                       )
                       st.foundations
                   }
-              Just { cardId: (TableauId originPileId) } ->
+              Just { pileId: (TableauId originPileId) } ->
                 st
                   { tableau = mapWithIndex
                       ( \i p ->
                           if i == originPileId then mapWithIndex
                             ( \j card ->
-                                if j == 0 then (setFlipped true card)
-                                else card
+                                if j == 0 then
+                                  (\r -> r { flipped = true }) <$> card
+                                else 
+                                  card
                             )
                             (fromMaybe [] $ tail p)
                           else p
@@ -329,7 +322,7 @@ handleAction = case _ of
 
                       st.tableau
                   }
-              Just { cardId: Waste } -> st { waste = fromMaybe [] $ tail st.waste }
+              Just { pileId: Waste } -> st { waste = fromMaybe [] $ tail st.waste }
               _ -> st
       )
 
@@ -354,25 +347,25 @@ handleAction = case _ of
   NoOp -> pure unit
 
 getDragTarget
-  :: CardId
+  :: PileId
   -> State
   -> Maybe
        { card :: (Card Unit)
-       , cardId :: CardId
+       , pileId :: PileId
        }
-getDragTarget cardId { foundations, tableau, waste } =
-  case cardId of
+getDragTarget pileId { foundations, tableau, waste } =
+  case pileId of
     FoundationId i -> do
       pile <- index foundations i
       card <- head pile
-      pure { card, cardId }
+      pure { card, pileId }
     TableauId i -> do
       pile <- index tableau i
       card <- head $ discardInfo <$> pile
-      pure { card, cardId }
+      pure { card, pileId }
     Waste -> do
       card <- head waste
-      pure { card, cardId }
+      pure { card, pileId }
 
 ------------------------------------------------ RENDER -------------------------------------------------
 
@@ -559,7 +552,7 @@ render state =
         , renderFoundations state.foundations
 
         -- Tableau
-        , renderTableau state.tableau (map (f <<< _.cardId) state.dragTarget)
+        , renderTableau state.tableau (map (f <<< _.pileId) state.dragTarget)
         ]
     ]
   where
