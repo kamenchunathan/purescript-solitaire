@@ -5,6 +5,7 @@ module Data.Card
   , Value(..)
   , NormalCard
   , color
+  , unwrap
   ) where
 
 import Prelude
@@ -99,4 +100,9 @@ color (NormalCard c _) =
     Clubs -> Black
     _ -> Red
 color (Joker cardColor _) = cardColor
+
+unwrap :: forall a. Card a -> a
+unwrap = case _ of
+  Joker _ a -> a
+  NormalCard _ a -> a
 

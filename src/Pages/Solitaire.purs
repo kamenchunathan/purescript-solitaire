@@ -4,7 +4,7 @@ import Prelude
 
 import Component.Navbar (navbar)
 import Data.Array (head, index, length, mapWithIndex, replicate, reverse, splitAt, tail, (..), (:))
-import Data.Card (Card(..), CardColour(..), Suit(..), Value(..))
+import Data.Card (Card(..), CardColour(..), Suit(..), Value(..), unwrap)
 import Data.Foldable (foldr)
 import Data.Int (decimal, toStringAs)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -109,12 +109,9 @@ splitDecktoTableauAndStock deck =
     { after: deck, before: [] }
     (1 .. 7)
 
-discardInfo :: forall a. Card a -> Card Unit
-discardInfo card =
-  case card of
-    NormalCard a _ -> NormalCard a unit
-    Joker a _ -> Joker a unit
-
+discardInner :: forall a. Card a -> Card Unit
+discardInner card = (\_ -> unit) <$> card
+  
 withDefaultTableauInfo :: forall a. Card a -> Card TableauInfo
 withDefaultTableauInfo = case _ of
   NormalCard a _ -> NormalCard a { flipped: false }
@@ -140,11 +137,6 @@ withFlippedTopCard cards =
     append
       (fromMaybe [] $ map faceup (head $ reverse cards))
       (fromMaybe [] $ map facedown (tail $ reverse cards))
-
-getFlipped :: forall r. Card { flipped :: Boolean | r } -> Boolean
-getFlipped = case _ of
-  Joker _ { flipped } -> flipped
-  NormalCard _ { flipped } -> flipped
 
 ------------------------------------------------ UPDATE -------------------------------------------------
 -- TODO: Rename Not really cardid it is more a pileId
@@ -218,7 +210,7 @@ handleAction = case _ of
               st
                 { dragTarget = do
                     pile <- index st.tableau i
-                    card <- discardInfo <$> head pile
+                    card <- discardInner <$> head pile
                     pure { card, pileId }
                 }
             Waste -> st
@@ -361,7 +353,7 @@ getDragTarget pileId { foundations, tableau, waste } =
       pure { card, pileId }
     TableauId i -> do
       pile <- index tableau i
-      card <- head $ discardInfo <$> pile
+      card <- head $ discardInner <$> pile
       pure { card, pileId }
     Waste -> do
       card <- head waste
@@ -505,14 +497,14 @@ renderTableauPile hideTopCard pileId pile =
     ]
     ( mapWithIndex
         ( \i card ->
-            if getFlipped card then
+          if unwrap $ _.flipped <$> card then
               HH.div
                 [ HP.draggable true
                 , HE.onDragStart $ DragStart $ TableauId pileId
                 ]
                 [ renderCardImage
                     { card
-                    , flipped: getFlipped card
+                    , flipped: unwrap (_.flipped <$> card)
                     , hide: hideTopCard && i == (length pile - 1)
                     }
                 ]
@@ -523,7 +515,7 @@ renderTableauPile hideTopCard pileId pile =
                 ]
                 [ renderCardImage
                     { card
-                    , flipped: getFlipped card
+                    , flipped: unwrap (_.flipped <$> card)
                     , hide: false
                     }
                 ]
