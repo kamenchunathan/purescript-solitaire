@@ -2,6 +2,7 @@
 .cache/
 .parcel-cache/
 .psci_modules/
+.purs-repl
 .spago/
 dist/
 distassets/

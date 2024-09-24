@@ -1,0 +1,30 @@
+package:
+  name: solitaire
+  dependencies:
+    - aff
+    - arrays
+    - console
+    - effect
+    - either
+    - foldable-traversable
+    - foreign
+    - halogen
+    - integers
+    - lists
+    - maybe
+    - prelude
+    - routing
+    - routing-duplex
+    - strings
+    - tuples
+    - typelevel-prelude
+    - web-events
+    - web-html
+    - web-uievents
+  test:
+    main: Test.Main
+    dependencies: []
+workspace:
+  packageSet:
+    registry: 60.0.1
+  extraPackages: {}

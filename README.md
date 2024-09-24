@@ -1,4 +1,6 @@
-# Card Games Site
+# Kadi
+> A card and board games site
+
 A Site where you can play card games to be used for testing strategies and AI against humans.
 Written in purescript with the halogen framework. 
 

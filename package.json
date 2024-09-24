@@ -1,11 +1,12 @@
 {
   "name": "solitaire",
   "version": "0.0.1",
-  "description": "A simple solitaire game in purescript",
+  "description": "A card and board game",
   "directories": {
     "test": "test"
   },
   "scripts": {
+    "postinstall": "spago install",
     "dev": "pnpm run build:purescript && vite",
     "build": "pnpm run build:purescript && tsc && vite build",
     "build:purescript": "spago build",
@@ -26,13 +27,12 @@
   },
   "homepage": "https://github.com/kamenchunathan/purescript-solitaire#readme",
   "devDependencies": {
-    "autoprefixer": "^10.4.14",
-    "concurrently": "^7.3.0",
-    "postcss": "^8.4.23",
-    "purescript": "^0.15.4",
-    "spago": "^0.20.9",
-    "tailwindcss": "^3.2.4",
-    "typescript": "^4.9.5",
-    "vite": "^3.1.8"
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "purescript": "=0.15.15",
+    "spago": "=0.93.38",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.7"
   }
 }
