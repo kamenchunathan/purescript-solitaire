@@ -15,13 +15,13 @@ newtype AppM a = AppM (Aff a)
 runAppM :: AppM ~> Aff
 runAppM (AppM m) = m
 
-derive newtype instance functorAppM :: Functor AppM
-derive newtype instance applyAppM :: Apply AppM
-derive newtype instance applicativeAppM :: Applicative AppM
-derive newtype instance bindAppM :: Bind AppM
-derive newtype instance monadAppM :: Monad AppM
-derive newtype instance monadEffectAppM :: MonadEffect AppM
-derive newtype instance monadAffAppM :: MonadAff AppM
+derive newtype instance  Functor AppM
+derive newtype instance  Apply AppM
+derive newtype instance  Applicative AppM
+derive newtype instance  Bind AppM
+derive newtype instance  Monad AppM
+derive newtype instance  MonadEffect AppM
+derive newtype instance  MonadAff AppM
 
-instance navigateAppM :: Navigate AppM where
+instance Navigate AppM where
   navigate nav route = liftEffect $ nav.pushState (unsafeToForeign {}) (print routeCodec route)

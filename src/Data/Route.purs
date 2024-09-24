@@ -12,11 +12,11 @@ data Route
   | Solitaire
   | NotFound
 
-derive instance genericRoute :: Generic Route _
-derive instance eqRoute :: Eq Route
-derive instance ordRoute :: Ord Route
+derive instance Generic Route _
+derive instance Eq Route
+derive instance Ord Route
 
-instance showRoute :: Show Route where
+instance Show Route where
   show Home = "home"
   show Solitaire = "solitaire"
   show NotFound = "notfound"

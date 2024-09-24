@@ -107,12 +107,12 @@ data CardId
   | TableauId Int
   | Waste
 
-instance showCardId :: Show CardId where
+instance Show CardId where
   show (FoundationId id) = "foundation " <> (toStringAs decimal id)
   show (TableauId id) = "tableau " <> (toStringAs decimal id)
   show Waste = "waste"
 
-instance eqCardId :: Eq CardId where
+instance Eq CardId where
   eq (FoundationId i) (FoundationId j) = i == j
   eq (TableauId i) (TableauId j) = i == j
   eq (Waste) (Waste) = true
